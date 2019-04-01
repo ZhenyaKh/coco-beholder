@@ -5,20 +5,22 @@ import subprocess
 import socket
 import sys
 from time import sleep
+import time
+import random
 
 from mininet.topo import Topo
-from mininet.net import Mininet
-from mininet.log import setLogLevel, info
-from mininet.cli import CLI
+from mininet.net  import Mininet
+from mininet.log  import setLogLevel, info
+from mininet.cli  import CLI
 
-USER_ARG           = 1
-SCHEME_ARG         = 2
-DIR_ARG            = 3
-PANTHEON_ARG       = 4
-RATE_ARG           = 5
-RUNTIME_ARG        = 6
-WRAPPERS_PATH      = 'src/wrappers'
-THIRD_PARTY_DIR    = 'third_party'
+USER_ARG        = 1
+SCHEME_ARG      = 2
+DIR_ARG         = 3
+PANTHEON_ARG    = 4
+RATE_ARG        = 5
+RUNTIME_ARG     = 6
+WRAPPERS_PATH   = 'src/wrappers'
+THIRD_PARTY_DIR = 'third_party'
 
 #        
 # Custom point-to-point Mininet topology class
@@ -77,12 +79,13 @@ def whoIsServer(schemePath):
 def run_test(firstHost, secondHost, scheme, schemePath, user):
     firstIntf, secondIntf = str(firstHost.intf()), str(secondHost.intf())
 
-    firstHost.cmd('tc qdisc delete dev %s root'                 % firstIntf)
-    firstHost.cmd('tc qdisc add dev %s root netem rate %sMbit'  % (firstIntf, sys.argv[RATE_ARG]))
-                
-    secondHost.cmd('tc qdisc delete dev %s root'                % secondIntf)
-    secondHost.cmd('tc qdisc add dev %s root netem rate %sMbit' % (secondIntf, sys.argv[RATE_ARG]))
-    
+    firstHost.cmd ('tc qdisc delete dev %s root' % firstIntf)
+    firstHost.cmd ('tc qdisc add dev %s root netem rate %sMbit delay %dms' % (firstIntf,  sys.argv[RATE_ARG], 30))
+
+    secondHost.cmd('tc qdisc delete dev %s root' % secondIntf)
+    secondHost.cmd('tc qdisc add dev %s root netem rate %sMbit delay %dms' % (secondIntf, sys.argv[RATE_ARG], 30))
+
+
     server, client       = whoIsServer(schemePath)
     serverIp, serverPort = firstHost.IP(firstIntf), getFreePort()
 
@@ -100,7 +103,27 @@ def run_test(firstHost, secondHost, scheme, schemePath, user):
     sleep(1)
     secondHost.popen(" ".join(['sudo -u', user, schemePath, client, serverIp, serverPort]))
 
-    sleep(int(sys.argv[RUNTIME_ARG]))
+    #sleep(int(sys.argv[RUNTIME_ARG]))
+    runtimeSecs = int(sys.argv[RUNTIME_ARG])
+    deltaMsecs  = 500
+    x = runtimeSecs * 1000 / deltaMsecs
+    k = 30
+    for i in range(0, x):
+        sleep(deltaMsecs / 1000.0)
+        print(time.time(), "%%%")
+        if bool(random.getrandbits(1)):
+            k+=10
+        else:
+            k-=10
+        print(k)
+        firstHost.cmd(
+            'tc qdisc change dev %s root netem rate %sMbit delay %dms' % (firstIntf, sys.argv[RATE_ARG], k))
+        secondHost.cmd(
+            'tc qdisc change dev %s root netem rate %sMbit delay %dms' % (secondIntf, sys.argv[RATE_ARG], k))
+        print(time.time(), "###")
+
+
+
 
     firstHost.cmd('pkill -f', schemePath)
     firstHost.cmd('pkill -f', os.path.join(sys.argv[PANTHEON_ARG], THIRD_PARTY_DIR))
@@ -122,6 +145,4 @@ if __name__ == '__main__':
     subprocess.call([schemePath, 'setup_after_reboot'])
 
     run_test(net['h1'], net['h2'], scheme, schemePath, sys.argv[USER_ARG])
-    #CLI(net)
- 
-
+    CLI(net)
