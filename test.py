@@ -4,9 +4,9 @@ import os
 import subprocess
 import socket
 import sys
-from time import sleep
-import time
 import random
+import time
+from time import sleep
 
 from mininet.topo import Topo
 from mininet.net  import Mininet
@@ -19,6 +19,10 @@ DIR_ARG         = 3
 PANTHEON_ARG    = 4
 RATE_ARG        = 5
 RUNTIME_ARG     = 6
+MAX_DELAY_ARG   = 7
+BASE_ARG        = 8
+DELTA_ARG       = 9
+STEP_ARG        = 10
 WRAPPERS_PATH   = 'src/wrappers'
 THIRD_PARTY_DIR = 'third_party'
 
@@ -75,16 +79,19 @@ def whoIsServer(schemePath):
 # param [in] scheme     - the name of the scheme to test
 # param [in] schemePath - the path of the scheme's wrapper in Pantheon
 # param [in] user       - name of the OS user running the tests
+# param [in] deltas     - array of delta times in seconds
+# param [in] deltas     - array of delays in microseconds corresponding to the array of delta times
 #
-def run_test(firstHost, secondHost, scheme, schemePath, user):
+def run_test(firstHost, secondHost, scheme, schemePath, user, deltas, delays):
     firstIntf, secondIntf = str(firstHost.intf()), str(secondHost.intf())
 
     firstHost.cmd ('tc qdisc delete dev %s root' % firstIntf)
-    firstHost.cmd ('tc qdisc add dev %s root netem rate %sMbit delay %dms' % (firstIntf,  sys.argv[RATE_ARG], 30))
+    firstHost.cmd ('tc qdisc add dev %s root netem rate %sMbit delay %d' %
+                  (firstIntf,  sys.argv[RATE_ARG], delays[0]))
 
     secondHost.cmd('tc qdisc delete dev %s root' % secondIntf)
-    secondHost.cmd('tc qdisc add dev %s root netem rate %sMbit delay %dms' % (secondIntf, sys.argv[RATE_ARG], 30))
-
+    secondHost.cmd('tc qdisc add dev %s root netem rate %sMbit delay %d' %
+                  (secondIntf, sys.argv[RATE_ARG], delays[0]))
 
     server, client       = whoIsServer(schemePath)
     serverIp, serverPort = firstHost.IP(firstIntf), getFreePort()
@@ -92,9 +99,9 @@ def run_test(firstHost, secondHost, scheme, schemePath, user):
     serverDump = os.path.join(sys.argv[DIR_ARG], "%s-%s.pcap" % (scheme, server))
     clientDump = os.path.join(sys.argv[DIR_ARG], "%s-%s.pcap" % (scheme, client))
 
-    cmd = 'tcpdump -tt -nn -i %s  -Z  %s -w  %s '\
+    cmd = 'tcpdump -tt -nn -i %s -Z %s -w %s '\
           'host 10.0.0.1 and host 10.0.0.2 and not arp and not icmp and not icmp6'
-          
+
     firstHost. popen(cmd % (firstIntf,  user, serverDump), stdout = None)
     secondHost.popen(cmd % (secondIntf, user, clientDump), stdout = None)
 
@@ -103,31 +110,67 @@ def run_test(firstHost, secondHost, scheme, schemePath, user):
     sleep(1)
     secondHost.popen(" ".join(['sudo -u', user, schemePath, client, serverIp, serverPort]))
 
-    #sleep(int(sys.argv[RUNTIME_ARG]))
-    runtimeSecs = int(sys.argv[RUNTIME_ARG])
-    deltaMsecs  = 500
-    x = runtimeSecs * 1000 / deltaMsecs
-    k = 30
-    for i in range(0, x):
-        sleep(deltaMsecs / 1000.0)
-        print(time.time(), "%%%")
-        if bool(random.getrandbits(1)):
-            k+=10
-        else:
-            k-=10
-        print(k)
-        firstHost.cmd(
-            'tc qdisc change dev %s root netem rate %sMbit delay %dms' % (firstIntf, sys.argv[RATE_ARG], k))
-        secondHost.cmd(
-            'tc qdisc change dev %s root netem rate %sMbit delay %dms' % (secondIntf, sys.argv[RATE_ARG], k))
-        print(time.time(), "###")
+    sleep(deltas[0])
+    k = 0.0
+    for i in range(1, len(deltas)):
+        timeStart = time.time()
 
+        firstHost.cmd ('tc qdisc change dev %s root netem rate %sMbit delay %d' %
+                      (firstIntf,  sys.argv[RATE_ARG], delays[i]))
 
+        secondHost.cmd('tc qdisc change dev %s root netem rate %sMbit delay %d' %
+                      (secondIntf, sys.argv[RATE_ARG], delays[i]))
 
+        k+=(time.time() - timeStart)
+        q= max(0, deltas[i] - (time.time() - timeStart))
+        #print(q)
+        sleep(q)
 
+    print(k/len(range(1, len(deltas))))
     firstHost.cmd('pkill -f', schemePath)
     firstHost.cmd('pkill -f', os.path.join(sys.argv[PANTHEON_ARG], THIRD_PARTY_DIR))
     firstHost.cmd('killall tcpdump')
+
+
+#
+# Function generates arrays of delta times and corresponding delays
+# param [in] runtime  - the time during which the test should be run in total
+# param [in] maxDelay - the maximum allowed delay which can be set for interfaces
+# param [in] base     - the initial delay set for interfaces
+# param [in] delta    - the time period after which delay is changed by specific step
+# param [in] step     - the step by which delay is changed each delta time period
+# returns arrays of delta times in seconds and corresponding delays in microseconds
+#
+def generate_steps(runtime, maxDelay, base, delta, step):
+    runtime       = int(runtime) * int(1e6)
+    delta         = int(delta)
+    deltasNumber  = runtime / delta
+    reminderDelta = runtime % delta
+    deltas        = [ float(delta) / 1e6 ] * deltasNumber
+
+    if reminderDelta != 0:
+        deltas = deltas + [ float(reminderDelta) / 1e6 ]
+
+    delay    = int(base)
+    delays   = [ delay ]
+    step     = int(step)
+    maxDelay = int(maxDelay)
+
+    if delay + step > maxDelay and delay - step < 0:
+        sys.exit("Schedule of delay changes cannot be generated because step is too big")
+
+    for delta in deltas[1:]:
+        signs = []
+
+        if delay + step <= maxDelay:
+            signs = signs + [ 1 ]
+        if delay - step >= 0:
+            signs = signs + [-1 ]
+
+        delay  += step * random.choice(signs)
+        delays += [ delay ]
+
+    return deltas, delays
 
 
 #
@@ -144,5 +187,8 @@ if __name__ == '__main__':
     schemePath = os.path.join(sys.argv[PANTHEON_ARG], WRAPPERS_PATH, scheme + '.py')
     subprocess.call([schemePath, 'setup_after_reboot'])
 
-    run_test(net['h1'], net['h2'], scheme, schemePath, sys.argv[USER_ARG])
-    CLI(net)
+    deltas, delays = generate_steps(sys.argv[RUNTIME_ARG], sys.argv[MAX_DELAY_ARG],
+                                    sys.argv[BASE_ARG], sys.argv[DELTA_ARG], sys.argv[STEP_ARG])
+
+    run_test(net['h1'], net['h2'], scheme, schemePath, sys.argv[USER_ARG], deltas, delays)
+    #CLI(net)
