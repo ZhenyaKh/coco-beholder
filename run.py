@@ -59,13 +59,28 @@ def parse_config(pantheonDir):
         return yaml.load(config)['schemes'].keys()
 
 
+#
+# Custom HelpFormatter class
+#
+class BlankLinesHelpFormatter (argparse.HelpFormatter):
+    #
+    # Function insert blank lines between entries of the help message of the program
+    # param [in] self  - class instance
+    # param [in] text  - text of an entry of the help message
+    # param [in] width - width of the help message
+    # returns array of lines of an entry of the help message ending with the blank line
+    #
+    def _split_lines(self, text, width):
+        return super(BlankLinesHelpFormatter, self)._split_lines(text, width) + ['']
+
+
 #        
 # Function processes input arguments of the script
 # returns list of input arguments of the script
 #
 def parse_arguments():
-    parser = argparse.ArgumentParser(description=
-    'The script runs tests and outputs pcap-files captured at senders and receivers to '
+    parser = argparse.ArgumentParser(formatter_class=BlankLinesHelpFormatter, description=
+    'The script runs tests and outputs pcap-files captured at sender and receiver to '
     'a specified directory.')
 
     parser.add_argument('--dir', default='data', help='output directory, default is "data"')
@@ -73,7 +88,7 @@ def parse_arguments():
     parser.add_argument('-a', '--all', action='store_true',
                         help='test all schemes')
 
-    parser.add_argument('-p', '--pantheon', required=True, 
+    parser.add_argument('-p', '--pantheon', required=True,
                         help='Pantheon directory where schemes will be searched')
 
     parser.add_argument('-s', '--schemes', metavar='"SCHEME1 SCHEME2..."',
@@ -97,6 +112,10 @@ def parse_arguments():
                          help='Step by which delay is changed each delta time in these formats: '\
                               'N (milliseconds assumed), Nus, Nms, Ns. '\
                               'Delay will always lie in range [0us, %dus].' % MAX_DELAY_US)
+
+    parser.add_argument('jitter', action="store", nargs='?',
+                        help='Jitter affecting the delay in the formats: ' \
+                             'N (milliseconds assumed), Nus, Nms, Ns. ')
 
     args = parser.parse_args()
 
@@ -124,12 +143,16 @@ def parse_arguments():
         args.schemes = args.schemes.split()
         verify_schemes(args.schemes, allSchemes)
 
-    args.base  = parse_time_str(args.base)
-    args.delta = parse_time_str(args.delta)
-    args.step  = parse_time_str(args.step)
+    args.base   = parse_time_str(args.base)
+    args.delta  = parse_time_str(args.delta)
+    args.step   = parse_time_str(args.step)
+    args.jitter = parse_time_str(args.jitter) if args.jitter else 0
 
-    if args.delta == 0 or args.step == 0:
-        sys.exit("Delta time and step cannot be zero.")
+    if args.step == 0:
+        sys.exit("Step cannot be zero.")
+
+    if args.delta < 10000:
+        sys.exit("Delta time less than 10ms makes no sense, as tc qdisc change takes around 4ms.")
 
     return args
 
@@ -151,7 +174,7 @@ if __name__ == '__main__':
         print("Testing %s..." % scheme)
         subprocess.call('sudo python test.py %s %s %s %s %s %s %s %s %s %s %s' %
            (user, scheme, args.dir,  args.pantheon, args.rate, args.runtime,
-            MAX_DELAY_US, args.base, args.delta,    args.step, 'jitter'), shell=True)
+            MAX_DELAY_US, args.base, args.delta,    args.step, args.jitter), shell=True)
 
     subprocess.call('sudo mn -c --verbosity=output', shell=True)
     print("Done.")

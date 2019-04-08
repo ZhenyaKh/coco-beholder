@@ -23,6 +23,7 @@ MAX_DELAY_ARG   = 7
 BASE_ARG        = 8
 DELTA_ARG       = 9
 STEP_ARG        = 10
+JITTER_ARG      = 11
 WRAPPERS_PATH   = 'src/wrappers'
 THIRD_PARTY_DIR = 'third_party'
 
@@ -86,12 +87,12 @@ def run_test(firstHost, secondHost, scheme, schemePath, user, deltas, delays):
     firstIntf, secondIntf = str(firstHost.intf()), str(secondHost.intf())
 
     firstHost.cmd ('tc qdisc delete dev %s root' % firstIntf)
-    firstHost.cmd ('tc qdisc add dev %s root netem rate %sMbit delay %d' %
-                  (firstIntf,  sys.argv[RATE_ARG], delays[0]))
+    firstHost.cmd ('tc qdisc add dev %s root netem delay %dus %sus rate %sMbit' %
+                  (firstIntf,  delays[0], sys.argv[JITTER_ARG], sys.argv[RATE_ARG]))
 
     secondHost.cmd('tc qdisc delete dev %s root' % secondIntf)
-    secondHost.cmd('tc qdisc add dev %s root netem rate %sMbit delay %d' %
-                  (secondIntf, sys.argv[RATE_ARG], delays[0]))
+    secondHost.cmd('tc qdisc add dev %s root netem delay %dus %sus rate %sMbit' %
+                  (secondIntf, delays[0], sys.argv[JITTER_ARG], sys.argv[RATE_ARG]))
 
     server, client       = whoIsServer(schemePath)
     serverIp, serverPort = firstHost.IP(firstIntf), getFreePort()
@@ -109,24 +110,25 @@ def run_test(firstHost, secondHost, scheme, schemePath, user, deltas, delays):
     firstHost .popen(" ".join(['sudo -u', user, schemePath, server, serverPort]))
     sleep(1)
     secondHost.popen(" ".join(['sudo -u', user, schemePath, client, serverIp, serverPort]))
-
+    f = time.time()
     sleep(deltas[0])
-    k = 0.0
+
     for i in range(1, len(deltas)):
         timeStart = time.time()
 
-        firstHost.cmd ('tc qdisc change dev %s root netem rate %sMbit delay %d' %
-                      (firstIntf,  sys.argv[RATE_ARG], delays[i]))
+        #print(firstHost. cmd('tc qdisc show dev h1-eth0'))
+        #print(secondHost.cmd('tc qdisc show dev h2-eth0'))
+        #print("========")
 
-        secondHost.cmd('tc qdisc change dev %s root netem rate %sMbit delay %d' %
-                      (secondIntf, sys.argv[RATE_ARG], delays[i]))
+        firstHost. cmd('tc qdisc change dev %s root netem delay %dus %sus rate %sMbit' %
+                      (firstIntf,  delays[i], sys.argv[JITTER_ARG], sys.argv[RATE_ARG]))
 
-        k+=(time.time() - timeStart)
-        q= max(0, deltas[i] - (time.time() - timeStart))
-        #print(q)
-        sleep(q)
+        secondHost.cmd('tc qdisc change dev %s root netem delay %dus %sus rate %sMbit' %
+                      (secondIntf, delays[i], sys.argv[JITTER_ARG], sys.argv[RATE_ARG]))
 
-    print(k/len(range(1, len(deltas))))
+        sleep(max(0, deltas[i] - (time.time() - timeStart)))
+    print(time.time() - f)
+
     firstHost.cmd('pkill -f', schemePath)
     firstHost.cmd('pkill -f', os.path.join(sys.argv[PANTHEON_ARG], THIRD_PARTY_DIR))
     firstHost.cmd('killall tcpdump')
