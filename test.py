@@ -110,15 +110,11 @@ def run_test(firstHost, secondHost, scheme, schemePath, user, deltas, delays):
     firstHost .popen(" ".join(['sudo -u', user, schemePath, server, serverPort]))
     sleep(1)
     secondHost.popen(" ".join(['sudo -u', user, schemePath, client, serverIp, serverPort]))
-    f = time.time()
+
     sleep(deltas[0])
 
     for i in range(1, len(deltas)):
         timeStart = time.time()
-
-        #print(firstHost. cmd('tc qdisc show dev h1-eth0'))
-        #print(secondHost.cmd('tc qdisc show dev h2-eth0'))
-        #print("========")
 
         firstHost. cmd('tc qdisc change dev %s root netem delay %dus %sus rate %sMbit' %
                       (firstIntf,  delays[i], sys.argv[JITTER_ARG], sys.argv[RATE_ARG]))
@@ -127,7 +123,6 @@ def run_test(firstHost, secondHost, scheme, schemePath, user, deltas, delays):
                       (secondIntf, delays[i], sys.argv[JITTER_ARG], sys.argv[RATE_ARG]))
 
         sleep(max(0, deltas[i] - (time.time() - timeStart)))
-    print(time.time() - f)
 
     firstHost.cmd('pkill -f', schemePath)
     firstHost.cmd('pkill -f', os.path.join(sys.argv[PANTHEON_ARG], THIRD_PARTY_DIR))
