@@ -1,6 +1,7 @@
 #!/usr/bin/python 
 
 import os
+import signal
 import subprocess
 import socket
 import sys
@@ -26,6 +27,7 @@ STEP_ARG        = 10
 JITTER_ARG      = 11
 WRAPPERS_PATH   = 'src/wrappers'
 THIRD_PARTY_DIR = 'third_party'
+FLOWS           = 100
 
 #        
 # Custom point-to-point Mininet topology class
@@ -41,7 +43,28 @@ class NetworkTopo(Topo):
         self.addLink(firstHost, secondHost)
 
 
-#        
+def killProcesses(clientProcesses, serverProcesses, pcapClientProcess, pcapServerProcess):
+    for clientProcess in clientProcesses:
+        os.killpg(os.getpgid(clientProcess.pid), signal.SIGTERM)
+
+    for serverProcess in serverProcesses:
+        os.killpg(os.getpgid(serverProcess.pid), signal.SIGTERM)
+
+    os.kill(pcapClientProcess.pid, signal.SIGTERM)
+    os.kill(pcapServerProcess.pid, signal.SIGTERM)
+
+
+def launch_clients(user, schemePath, secondHost, client, serverIp, serverPorts):
+    clientProcesses = []
+
+    for port in serverPorts:
+        clientProcess = secondHost.popen(['sudo', '-u', user, schemePath, client, serverIp, port])
+        clientProcesses.append(clientProcess)
+
+    return clientProcesses
+
+
+#
 # Function returns an available port
 # returns an available port
 #
@@ -53,6 +76,20 @@ def getFreePort():
     port = sock.getsockname()[1]
     sock.close()
     return str(port)
+
+
+def launch_servers(user, schemePath, firstHost, server):
+    serverPorts     = []
+    serverProcesses = []
+
+    for i in range(0, FLOWS):
+        serverPort    = getFreePort()
+        serverProcess = firstHost.popen(['sudo', '-u', user, schemePath, server, serverPort])
+
+        serverPorts    .append(serverPort)
+        serverProcesses.append(serverProcess)
+
+    return serverProcesses, serverPorts
 
 
 #        
@@ -94,22 +131,21 @@ def run_test(firstHost, secondHost, scheme, schemePath, user, deltas, delays):
     secondHost.cmd('tc qdisc add dev %s root netem delay %dus %sus rate %sMbit' %
                   (secondIntf, delays[0], sys.argv[JITTER_ARG], sys.argv[RATE_ARG]))
 
-    server, client       = whoIsServer(schemePath)
-    serverIp, serverPort = firstHost.IP(firstIntf), getFreePort()
+    server,   client   = whoIsServer(schemePath)
+    serverIp, clientIp = firstHost.IP(firstIntf), secondHost.IP(secondIntf)
 
     serverDump = os.path.join(sys.argv[DIR_ARG], "%s-%s.pcap" % (scheme, server))
     clientDump = os.path.join(sys.argv[DIR_ARG], "%s-%s.pcap" % (scheme, client))
 
     cmd = 'tcpdump -tt -nn -i %s -Z %s -w %s '\
-          'host 10.0.0.1 and host 10.0.0.2 and not arp and not icmp and not icmp6'
+          'host %s and host %s and not arp and not icmp and not icmp6'
 
-    firstHost. popen(cmd % (firstIntf,  user, serverDump), stdout = None)
-    secondHost.popen(cmd % (secondIntf, user, clientDump), stdout = None)
+    pcapServerProcess = firstHost. popen(cmd % (firstIntf,  user, serverDump, serverIp, clientIp))
+    pcapClientProcess = secondHost.popen(cmd % (secondIntf, user, clientDump, serverIp, clientIp))
 
+    serverProcesses, serverPorts = launch_servers(user, schemePath, firstHost, server)
     sleep(1)
-    firstHost .popen(" ".join(['sudo -u', user, schemePath, server, serverPort]))
-    sleep(1)
-    secondHost.popen(" ".join(['sudo -u', user, schemePath, client, serverIp, serverPort]))
+    clientProcesses = launch_clients(user, schemePath, secondHost, client, serverIp, serverPorts)
 
     sleep(deltas[0])
 
@@ -124,9 +160,7 @@ def run_test(firstHost, secondHost, scheme, schemePath, user, deltas, delays):
 
         sleep(max(0, deltas[i] - (time.time() - timeStart)))
 
-    firstHost.cmd('pkill -f', schemePath)
-    firstHost.cmd('pkill -f', os.path.join(sys.argv[PANTHEON_ARG], THIRD_PARTY_DIR))
-    firstHost.cmd('killall tcpdump')
+    killProcesses(clientProcesses, serverProcesses, pcapClientProcess, pcapServerProcess)
 
 
 #
@@ -175,7 +209,7 @@ def generate_steps(runtime, maxDelay, base, delta, step):
 #
 if __name__ == '__main__':
     #setLogLevel('info')
-
+    random.seed(1)
     scheme = sys.argv[SCHEME_ARG]
 
     topo = NetworkTopo()    

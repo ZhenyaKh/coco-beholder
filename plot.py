@@ -14,8 +14,8 @@ import numpy as np
 import argparse
 
 SENDER                 = 'sender'
-SENDERS_FILE_NAME      = 'senders-throughputs.png'
-RECEIVERS_FILE_NAME    = 'receivers-throughputs.png'
+SENDERS_FILE_NAME      = 'senders-THROUGHPUTS.png'
+RECEIVERS_FILE_NAME    = 'receivers-THROUGHPUTS.png'
 DURATION_LINE          = 4
 BYTES_COLUMN           = -2
 FRAMES_COLUMN          = -3
