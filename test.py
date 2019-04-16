@@ -6,6 +6,7 @@ import subprocess
 import socket
 import sys
 import random
+import threading
 import time
 from time import sleep
 
@@ -27,13 +28,31 @@ STEP_ARG        = 10
 JITTER_ARG      = 11
 WRAPPERS_PATH   = 'src/wrappers'
 THIRD_PARTY_DIR = 'third_party'
-FLOWS           = 100
+FLOWS           = 5
 
-#        
+
+from threading import Thread,Semaphore
+
+class Barrier:
+    def __init__(self, n):
+        self.n = n
+        self.count = 0
+        self.mutex = Semaphore(1)
+        self.barrier = Semaphore(0)
+
+    def wait(self):
+        self.mutex.acquire()
+        self.count = self.count + 1
+        self.mutex.release()
+        if self.count == self.n: self.barrier.release()
+        self.barrier.acquire()
+        self.barrier.release()
+
+#
 # Custom point-to-point Mininet topology class
 #
 class NetworkTopo(Topo):
-    #        
+    #
     # Constructor
     #
     def build(self, **_opts):
@@ -54,14 +73,31 @@ def killProcesses(clientProcesses, serverProcesses, pcapClientProcess, pcapServe
     os.kill(pcapServerProcess.pid, signal.SIGTERM)
 
 
-def launch_clients(user, schemePath, secondHost, client, serverIp, serverPorts):
-    clientProcesses = []
+clientProcesses = []
+barrier         = Barrier(FLOWS + 1)
 
-    for port in serverPorts:
-        clientProcess = secondHost.popen(['sudo', '-u', user, schemePath, client, serverIp, port])
+class Client(threading.Thread):
+    def __init__(self, user, schemePath, secondHost, client, serverIp, serverPort, sleepTime):
+        threading.Thread.__init__(self)
+        self.user       = user
+        self.schemePath = schemePath
+        self.secondHost = secondHost
+        self.client     = client
+        self.serverIp   = serverIp
+        self.serverPort = serverPort
+        self.sleepTime  = sleepTime
+
+
+    def run(self):
+        print(self.serverPort + " wait")
+        barrier.wait()
+        print(self.serverPort + " run")
+        sleep(self.sleepTime)
+
+        clientProcess = self.secondHost.popen(
+            ['sudo', '-u', self.user, self.schemePath, self.client, self.serverIp, self.serverPort])
+        print(self.serverPort + " LAUNCH")
         clientProcesses.append(clientProcess)
-
-    return clientProcesses
 
 
 #
@@ -92,7 +128,7 @@ def launch_servers(user, schemePath, firstHost, server):
     return serverProcesses, serverPorts
 
 
-#        
+#
 # Function determines who runs first: the sender or the receiver of the scheme
 # param [in] schemePath - the path of the scheme's wrapper in Pantheon
 # returns sender and receiver in the order of running
@@ -110,7 +146,7 @@ def whoIsServer(schemePath):
     return server, client
 
 
-#        
+#
 # Function runs testing for the scheme
 # param [in] firstHost  - the first  host of the point-to-point topology
 # param [in] secondHost - the second host of the point-to-point topology
@@ -145,7 +181,14 @@ def run_test(firstHost, secondHost, scheme, schemePath, user, deltas, delays):
 
     serverProcesses, serverPorts = launch_servers(user, schemePath, firstHost, server)
     sleep(1)
-    clientProcesses = launch_clients(user, schemePath, secondHost, client, serverIp, serverPorts)
+
+    threads = []
+    for i in range(0, FLOWS):
+        thread = Client(user, schemePath, secondHost, client, serverIp, serverPorts[i], 2 * i)
+        thread.start()
+        threads.append(thread)
+
+    barrier.wait()
 
     sleep(deltas[0])
 
