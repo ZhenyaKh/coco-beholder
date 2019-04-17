@@ -83,7 +83,7 @@ def parse_arguments():
     'The script runs tests and outputs pcap-files captured at sender and receiver to '
     'a specified directory.')
 
-    parser.add_argument('--dir', default='data', help='output directory, default is "data"')
+    parser.add_argument('-d', '--dir', default='data', help='output directory, default is "data"')
 
     parser.add_argument('-a', '--all', action='store_true',
                         help='test all schemes')
@@ -99,6 +99,11 @@ def parse_arguments():
 
     parser.add_argument('-t', '--runtime', default=30, type=int,
                         help='runtime of each test in seconds (default 30)')
+
+    parser.add_argument('-f', '--flows', type=int, default=1, help='number of flows (default 1)')
+
+    parser.add_argument('-i', '--interval', type=int, default=0,
+                        help='interval in seconds between two flows (default 0)')
 
     parser.add_argument('base', action="store",
                          help='Initial delay set both for sender and receiver in the formats: '\
@@ -131,7 +136,16 @@ def parse_arguments():
 
     if args.runtime > 60 or args.runtime <= 0: # same values as in Pantheon testing
         sys.exit('Runtime cannot be non-positive or greater than 60 seconds')
- 
+
+    if args.flows <= 0:
+        sys.exit('The number of flows should be positive')
+
+    if args.interval < 0:
+        sys.exit('Interval cannot be negative')
+
+    if (args.flows - 1) * args.interval >= args.runtime:
+        sys.exit('Interval time between flows is too long to be fit in runtime')
+
     if not args.all and args.schemes is None:
         sys.exit('Must specify --all or --schemes')
 
@@ -172,9 +186,10 @@ if __name__ == '__main__':
         subprocess.call('sudo mn -c --verbosity=output', shell=True)
 
         print("Testing %s..." % scheme)
-        subprocess.call('sudo python test.py %s %s %s %s %s %s %s %s %s %s %s' %
-           (user, scheme, args.dir,  args.pantheon, args.rate, args.runtime,
-            MAX_DELAY_US, args.base, args.delta,    args.step, args.jitter), shell=True)
+        subprocess.call('sudo python test.py %s %s %s %s %s %s %s %s %s %s %s %s %s' %
+           (user, scheme, args.dir,   args.pantheon, args.rate, args.runtime, MAX_DELAY_US,
+                          args.base,  args.delta,    args.step, args.jitter,
+                          args.flows, args.interval), shell=True)
 
     subprocess.call('sudo mn -c --verbosity=output', shell=True)
     print("Done.")
