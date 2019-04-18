@@ -47,6 +47,13 @@ class NetworkTopo(Topo):
         self.addLink(firstHost, secondHost)
 
 
+#
+# Function kills launched processes and its children
+# param [in] clientProcesses   - popen objects of launched client processes
+# param [in] serverProcesses   - popen objects of launched server processes
+# param [in] pcapClientProcess - tcpdump process recording on client
+# param [in] pcapServerProcess - tcpdump process recording on server
+#
 def killProcesses(clientProcesses, serverProcesses, pcapClientProcess, pcapServerProcess):
     for clientProcess in clientProcesses:
         os.killpg(os.getpgid(clientProcess.pid), signal.SIGTERM)
@@ -58,11 +65,23 @@ def killProcesses(clientProcesses, serverProcesses, pcapClientProcess, pcapServe
     os.kill(pcapServerProcess.pid, signal.SIGTERM)
 
 
+#
+# Array of popen objects of launched client processes. It is instantiated by launch_clients().
+#
 clientProcesses = []
+#
+# Synchronization object of the main thread and the thread which launches clients
+#
 startEvent = threading.Event()
-
+#
+# Function launches client processes. The function runs in a separate thread.
+# param [in] secondHost - the host on which the clients are launched
+# param [in] client     - "sender" or "receiver" of the scheme depending on who the clients are
+# param [in] serverIp   - IP address of the host with servers to which clients connect
+# param [in] ports      - array of ports of the servers to which clients connect
+#
 def launch_clients(secondHost, client, serverIp, ports):
-    f = timeStart = time.time()
+    benchmarkStart = timeStart = time.time()
 
     clientProcesses.append(
         secondHost.popen(['sudo', '-u', USER, SCHEME_PATH, client, serverIp, ports[0]]))
@@ -75,7 +94,7 @@ def launch_clients(secondHost, client, serverIp, ports):
         clientProcesses.append(
             secondHost.popen(['sudo', '-u', USER, SCHEME_PATH, client, serverIp, ports[i]]))
 
-    print(time.time()-f)
+    print(time.time() - benchmarkStart)
 
 
 #
@@ -92,11 +111,17 @@ def getFreePort():
     return str(port)
 
 
+#
+# Function launches server processes.
+# param [in] firstHost - the host on which the servers are launched
+# param [in] server    - "sender" or "receiver" of the scheme depending on who the servers are
+# returns popen objects of launched server processes and ports on which the servers listen
+#
 def launch_servers(firstHost, server):
     serverPorts     = []
     serverProcesses = []
 
-    for i in range(0, FLOWS):
+    for _ in range(0, FLOWS):
         serverPort    = getFreePort()
         serverProcess = firstHost.popen(['sudo', '-u', USER, SCHEME_PATH, server, serverPort])
 
@@ -106,7 +131,7 @@ def launch_servers(firstHost, server):
     return serverProcesses, serverPorts
 
 
-#        
+#
 # Function determines who runs first: the sender or the receiver of the scheme
 # returns sender and receiver in the order of running
 #
@@ -123,7 +148,45 @@ def whoIsServer():
     return server, client
 
 
-#        
+#
+# Function perform tc qdisc delay changes on interfaces of the two hosts
+# param [in] firstHost  - the first  host of the point-to-point topology
+# param [in] secondHost - the second host of the point-to-point topology
+# param [in] firstIntf  - interface of the first  host
+# param [in] secondIntf - interface of the second host
+# param [in] deltasSec  - array of delta times in seconds
+# param [in] delaysUsec - array of delays in microseconds corresponding to the array of delta times
+#
+def perform_tc_delay_changes(firstHost, secondHost, firstIntf, secondIntf, deltasSec, delaysUsec):
+    sleep(deltasSec[0])
+
+    intervalsNumber = len(deltasSec)
+
+    if intervalsNumber != 1:
+        timeStart = time.time()
+
+        for i in range(1, intervalsNumber - 1):
+
+            firstHost. cmd('tc qdisc change dev %s root netem delay %dus %dus rate %sMbit' %
+                          (firstIntf,  delaysUsec[i], JITTER_USEC, RATE_MBITS))
+
+            secondHost.cmd('tc qdisc change dev %s root netem delay %dus %dus rate %sMbit' %
+                          (secondIntf, delaysUsec[i], JITTER_USEC, RATE_MBITS))
+
+            sleep(deltasSec[i] - ((time.time() - timeStart ) % deltasSec[i]))
+
+        timeStart = time.time()
+
+        firstHost. cmd('tc qdisc change dev %s root netem delay %dus %dus rate %sMbit' %
+                      (firstIntf,  delaysUsec[-1], JITTER_USEC, RATE_MBITS))
+
+        secondHost.cmd('tc qdisc change dev %s root netem delay %dus %dus rate %sMbit' %
+                      (secondIntf, delaysUsec[-1], JITTER_USEC, RATE_MBITS))
+
+        sleep(deltasSec[-1] - ((time.time() - timeStart) % deltasSec[-1]))
+
+
+#
 # Function runs testing for the scheme
 # param [in] firstHost  - the first  host of the point-to-point topology
 # param [in] secondHost - the second host of the point-to-point topology
@@ -155,21 +218,14 @@ def run_test(firstHost, secondHost, deltasSec, delaysUsec):
 
     serverProcesses, ports = launch_servers(firstHost, server)
     sleep(1)
+
     thread = threading.Thread(target = launch_clients, args = (secondHost, client, serverIp, ports))
     thread.start()
     startEvent.wait()
-    sleep(deltasSec[0])
 
-    for i in range(1, len(deltasSec)):
-        timeStart = time.time()
-
-        firstHost. cmd('tc qdisc change dev %s root netem delay %dus %dus rate %sMbit' %
-                      (firstIntf,  delaysUsec[i], JITTER_USEC, RATE_MBITS))
-
-        secondHost.cmd('tc qdisc change dev %s root netem delay %dus %dus rate %sMbit' %
-                      (secondIntf, delaysUsec[i], JITTER_USEC, RATE_MBITS))
-
-        sleep(max(0, deltasSec[i] - (time.time() - timeStart)))
+    benchmarkStart = time.time()
+    perform_tc_delay_changes(firstHost, secondHost, firstIntf, secondIntf, deltasSec, delaysUsec)
+    print(time.time() - benchmarkStart)
 
     thread.join()
     killProcesses(clientProcesses, serverProcesses, pcapClientProcess, pcapServerProcess)
@@ -194,7 +250,7 @@ def generate_steps():
     if delayUsec + STEP_USEC > MAX_DELAY_USEC and delayUsec - STEP_USEC < 0:
         sys.exit("Schedule of delay changes cannot be generated because step is too big")
 
-    for i in deltasSec[1:]:
+    for _ in deltasSec[1:]:
         signs = []
 
         if delayUsec + STEP_USEC <= MAX_DELAY_USEC:

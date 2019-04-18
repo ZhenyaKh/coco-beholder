@@ -134,7 +134,7 @@ def parse_arguments():
     if not os.path.exists(args.pantheon):
         sys.exit('Pantheon directory %s does not exist' % args.pantheon)
 
-    if args.runtime > 60 or args.runtime <= 0: # same values as in Pantheon testing
+    if args.runtime > 60 or args.runtime <= 0:
         sys.exit('Runtime cannot be non-positive or greater than 60 seconds')
 
     if args.flows <= 0:
@@ -161,9 +161,6 @@ def parse_arguments():
     args.delta  = parse_time_str(args.delta)
     args.step   = parse_time_str(args.step)
     args.jitter = parse_time_str(args.jitter) if args.jitter else 0
-
-    if args.step == 0:
-        sys.exit("Step cannot be zero.")
 
     if args.delta < 10000:
         sys.exit("Delta time less than 10ms makes no sense, as tc qdisc change takes around 4ms.")
