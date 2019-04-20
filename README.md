@@ -2,11 +2,10 @@
 
 ## Dependencies to install
   
-- ### **Pantheon** [https://github.com/StanfordSNR/pantheon]
+- ### [**Pantheon**](https://github.com/StanfordSNR/pantheon)
 
-  **_Attention!_**
-      
-  Before testing the third-party schemes present in Pantheon using the 
+  **IMPORTANT!**
+Before testing the third-party schemes present in Pantheon using the 
 Variable-Delay tool, it is crucial not only to install dependencies of the 
 schemes using `src/experiments/setup.py --install-deps` command but also to set 
 up the schemes using `src/experiments/setup.py --setup` command. Without the 
@@ -20,7 +19,7 @@ a user's machine.
 command (without `--setup`) on every reboot because the Variable-Delay tool 
 runs the command for all the schemes to be tested as it is. 
     
-- ### **Mininet** [https://github.com/mininet/mininet]
+- ### [**Mininet**](https://github.com/mininet/mininet)
 
   The point-to-point topology is built with Mininet. Launching clients and 
 servers of schemes, launching tcpdump recording, changing tc qdisc netem 
