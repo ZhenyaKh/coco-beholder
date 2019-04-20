@@ -81,18 +81,25 @@ startEvent = threading.Event()
 # param [in] ports      - array of ports of the servers to which clients connect
 #
 def launch_clients(secondHost, client, serverIp, ports):
-    benchmarkStart = timeStart = time.time()
+    benchmarkStart = timeStart = time.time() # TODO: remove benchmark
 
-    clientProcesses.append(
-        secondHost.popen(['sudo', '-u', USER, SCHEME_PATH, client, serverIp, ports[0]]))
-
-    startEvent.set()
-
-    for i in range(1, FLOWS):
-        sleep(INTERVAL_SEC - ((time.time() - timeStart) % INTERVAL_SEC))
-
+    if INTERVAL_SEC != 0:
         clientProcesses.append(
-            secondHost.popen(['sudo', '-u', USER, SCHEME_PATH, client, serverIp, ports[i]]))
+            secondHost.popen(['sudo', '-u', USER, SCHEME_PATH, client, serverIp, ports[0]]))
+
+        startEvent.set()
+
+        for i in range(1, FLOWS):
+            sleep(INTERVAL_SEC - ((time.time() - timeStart) % INTERVAL_SEC))
+
+            clientProcesses.append(
+                secondHost.popen(['sudo', '-u', USER, SCHEME_PATH, client, serverIp, ports[i]]))
+    else:
+        for i in range(0, FLOWS):
+            clientProcesses.append(
+                secondHost.popen(['sudo', '-u', USER, SCHEME_PATH, client, serverIp, ports[i]]))
+
+        startEvent.set()
 
     print(time.time() - benchmarkStart)
 
@@ -223,7 +230,7 @@ def run_test(firstHost, secondHost, deltasSec, delaysUsec):
     thread.start()
     startEvent.wait()
 
-    benchmarkStart = time.time()
+    benchmarkStart = time.time() # TODO: remove benchmark
     perform_tc_delay_changes(firstHost, secondHost, firstIntf, secondIntf, deltasSec, delaysUsec)
     print(time.time() - benchmarkStart)
 
@@ -269,7 +276,7 @@ def generate_steps():
 #
 if __name__ == '__main__':
     #setLogLevel('info')
-    random.seed(1)
+    random.seed(1) # TODO: make seed parameter
 
     topo = NetworkTopo()    
     net  = Mininet(topo=topo)
