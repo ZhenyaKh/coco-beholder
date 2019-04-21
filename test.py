@@ -135,6 +135,10 @@ def launch_servers(firstHost, server):
         serverPorts    .append(serverPort)
         serverProcesses.append(serverProcess)
 
+        # Check if the server's ready. Maybe, this is not the best way but in Pantheon they just
+        # sleep for three seconds after opening all the servers.
+        while not firstHost.cmd("lsof -i :%s" % serverPort).strip(): pass
+
     return serverProcesses, serverPorts
 
 
@@ -224,7 +228,6 @@ def run_test(firstHost, secondHost, deltasSec, delaysUsec):
     pcapClientProcess = secondHost.popen(cmd % (secondIntf, USER, clientDump, serverIp, clientIp))
 
     serverProcesses, ports = launch_servers(firstHost, server)
-    sleep(1)
 
     thread = threading.Thread(target = launch_clients, args = (secondHost, client, serverIp, ports))
     thread.start()
