@@ -71,12 +71,12 @@ def build_dumbbell_network():
     network.addLink(leftRouter, rightRouter)
 
     # getting two ip addresses for the interfaces of the two routers
-    subnet  = availableSubnets.next()
-    ipPools = ['%s/%d' % (host, subnet.prefixlen) for host in list(subnet.hosts())]
+    subnet = availableSubnets.next()
+    ipPool = ['%s/%d' % (host, subnet.prefixlen) for host in list(subnet.hosts())]
 
     # assigning the two ip addresses to the interfaces of the two routers
-    leftRouter. setIP(ipPools[0], intf=leftRouter. intfs[FLOWS])
-    rightRouter.setIP(ipPools[1], intf=rightRouter.intfs[FLOWS])
+    leftRouter. setIP(ipPool[0], intf=leftRouter. intfs[FLOWS])
+    rightRouter.setIP(ipPool[1], intf=rightRouter.intfs[FLOWS])
 
     # allowing the two halves of the dumbbell to exchange packets
     leftRouter. setDefaultRoute('via %s' % rightRouter.intfs[FLOWS].IP())
