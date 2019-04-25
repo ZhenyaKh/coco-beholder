@@ -78,7 +78,7 @@ def build_dumbbell_network():
     leftRouter. setIP(ipPools[0], intf=leftRouter. intfs[FLOWS])
     rightRouter.setIP(ipPools[1], intf=rightRouter.intfs[FLOWS])
 
-    # allowing two halves of the dumbbell to exchnage packets
+    # allowing the two halves of the dumbbell to exchange packets
     leftRouter. setDefaultRoute('via %s' % rightRouter.intfs[FLOWS].IP())
     rightRouter.setDefaultRoute('via %s' % leftRouter. intfs[FLOWS].IP())
 
