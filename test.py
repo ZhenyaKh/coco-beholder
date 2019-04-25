@@ -7,6 +7,7 @@ import socket
 import sys
 import random
 import threading
+import ipaddress
 import time
 from time import sleep
 
@@ -33,18 +34,56 @@ THIRD_PARTY_DIR = 'third_party'
 SCHEME_PATH     = os.path.join(PANTHEON, WRAPPERS_PATH, SCHEME + '.py')
 
 
-#        
-# Custom point-to-point Mininet topology class
-#
-class NetworkTopo(Topo):
-    #        
-    # Constructor
-    #
-    def build(self, **_opts):
-        firstHost  = self.addHost('h1')
-        secondHost = self.addHost('h2')
+def build_half_dumbbell(network, availableSubnets, hostLiteral, routerName):
+    hosts   = [ None ] * FLOWS
+    ipPools = [ None ] * FLOWS
 
-        self.addLink(firstHost, secondHost)
+    router = network.addHost(routerName)
+    router.cmd('sysctl net.ipv4.ip_forward=1')
+
+    for i in range (0, FLOWS):
+        # creating new host and connecting it to one of router interfaces
+        hosts[i] = network.addHost('%s%d' % (hostLiteral, (i + 1)))
+        network.addLink(hosts[i], router)
+
+        # getting two ip addresses for router interface and host interface
+        subnet     = availableSubnets.next()
+        ipPools[i] = [ '%s/%d' % (host, subnet.prefixlen) for host in list(subnet.hosts()) ]
+
+        # assigning the two ip addresses to the router interface and host interface
+        router  .setIP(ipPools[i][1], intf=router.intfs[i])
+        hosts[i].setIP(ipPools[i][0])
+
+        # setting the router as the default gateway for the host
+        hosts[i].setDefaultRoute('via %s' % router.intfs[i].IP())
+
+    return hosts, router
+
+
+def build_dumbbell_network():
+    network          = Mininet(build=False)
+    availableSubnets = ipaddress.ip_network(u'11.0.0.0/24').subnets(new_prefix=30)
+
+    servers, leftRouter  = build_half_dumbbell(network, availableSubnets, 's', 'r1')
+    clients, rightRouter = build_half_dumbbell(network, availableSubnets, 'c', 'r2')
+
+    # connecting the two halves of the dumbbell
+    network.addLink(leftRouter, rightRouter)
+
+    # getting two ip addresses for the interfaces of the two routers
+    subnet  = availableSubnets.next()
+    ipPools = ['%s/%d' % (host, subnet.prefixlen) for host in list(subnet.hosts())]
+
+    # assigning the two ip addresses to the interfaces of the two routers
+    leftRouter. setIP(ipPools[0], intf=leftRouter. intfs[FLOWS])
+    rightRouter.setIP(ipPools[1], intf=rightRouter.intfs[FLOWS])
+
+    # allowing two halves of the dumbbell to exchnage packets
+    leftRouter. setDefaultRoute('via %s' % rightRouter.intfs[FLOWS].IP())
+    rightRouter.setDefaultRoute('via %s' % leftRouter. intfs[FLOWS].IP())
+
+    # now each of 2*FLOWS hosts has 1 interface, each of 2 routers has FLOWS+1 interfaces
+    return network, servers, clients
 
 
 #
@@ -281,12 +320,11 @@ if __name__ == '__main__':
     #setLogLevel('info')
     random.seed(1) # TODO: make seed parameter
 
-    topo = NetworkTopo()    
-    net  = Mininet(topo=topo)
+    network, servers, clients = build_dumbbell_network()
 
     subprocess.call([SCHEME_PATH, 'setup_after_reboot'])
 
     deltasSec, delaysUsec = generate_steps()
 
-    run_test(net['h1'], net['h2'], deltasSec, delaysUsec)
-    #CLI(net)
+    #run_test(net['h1'], net['h2'], deltasSec, delaysUsec)
+    CLI(network)
