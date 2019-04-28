@@ -276,10 +276,12 @@ def build_half_dumbbell(network, availableSubnets, hostLiteral, routerName):
 
     router = network.addHost(routerName)
     router.cmd('sysctl net.ipv4.ip_forward=1')
+    router.cmd('ifconfig lo up')
 
     for i in range (0, FLOWS):
         # creating new host and connecting it to one of router interfaces
         hosts[i] = network.addHost('%s%d' % (hostLiteral, (i + 1)))
+        hosts[i].cmd('ifconfig lo up')
         network.addLink(hosts[i], router)
 
         # getting two ip addresses for router interface and host interface
