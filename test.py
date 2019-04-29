@@ -186,8 +186,8 @@ def start_tcpdump_recording(servers, clients, runsFirst, runsSecond):
         serverIp   = serverIntf.IP()
         clientIp   = clientIntf.IP()
 
-        serverDump = os.path.join(DIR, "%s-%s-%d.pcap" % (SCHEME, runsFirst,  i))
-        clientDump = os.path.join(DIR, "%s-%s-%d.pcap" % (SCHEME, runsSecond, i))
+        serverDump = os.path.join(DIR, "%s-%s-%d.pcap" % (SCHEME, runsFirst,  i + 1))
+        clientDump = os.path.join(DIR, "%s-%s-%d.pcap" % (SCHEME, runsSecond, i + 1))
 
         cmd = 'tcpdump -tt -nn -i %s -Z %s -w %s ' \
               'host %s and host %s and not arp and not icmp and not icmp6'
@@ -198,6 +198,7 @@ def start_tcpdump_recording(servers, clients, runsFirst, runsSecond):
         tcpdumpProcesses.append(clientDumpPopen)
         tcpdumpProcesses.append(serverDumpPopen)
 
+    sleep(0.5) # in order not to miss the first packets
     return tcpdumpProcesses
 
 
@@ -292,6 +293,14 @@ def build_half_dumbbell(network, availableSubnets, hostLiteral, routerName):
         router  .setIP(ipPools[i][1], intf=router.intfs[i])
         hosts[i].setIP(ipPools[i][0])
 
+        # turning off TCP segmentation offload and UDP fragmentation offload!
+        router.  cmd('ethtool -K %s tx off sg off tso off ufo off' % router.intfs[i])
+        hosts[i].cmd('ethtool -K %s tx off sg off tso off ufo off' % hosts[i].intf())
+
+        # setting egress qdisc of each of the two interfaces to FIFO queue limited by 1000 packets
+        router.  cmd('tc qdisc add dev %s root pfifo limit 1000'   % router.intfs[i])
+        hosts[i].cmd('tc qdisc add dev %s root pfifo limit 1000'   % hosts[i].intf())
+
         # setting the router as the default gateway for the host
         hosts[i].setDefaultRoute('via %s' % router.intfs[i].IP())
 
@@ -316,6 +325,10 @@ def build_dumbbell_network():
     leftRouter. setIP(ipPool[0], intf=leftRouter. intfs[FLOWS])
     rightRouter.setIP(ipPool[1], intf=rightRouter.intfs[FLOWS])
 
+    # turning off TCP segmentation offload and UDP fragmentation offload!
+    leftRouter. cmd('ethtool -K %s tx off sg off tso off ufo off' % leftRouter. intfs[FLOWS])
+    rightRouter.cmd('ethtool -K %s tx off sg off tso off ufo off' % rightRouter.intfs[FLOWS])
+
     # allowing the two halves of the dumbbell to exchange packets
     leftRouter. setDefaultRoute('via %s' % rightRouter.intfs[FLOWS].IP())
     rightRouter.setDefaultRoute('via %s' % leftRouter. intfs[FLOWS].IP())
@@ -334,8 +347,8 @@ if __name__ == '__main__':
 
     subprocess.call([SCHEME_PATH, 'setup_after_reboot'])
 
-    #deltasSec, delaysUsec = generate_steps()
+    deltasSec, delaysUsec = generate_steps()
 
-    #run_test(servers, clients, leftRouter, rightRouter, deltasSec, delaysUsec)
+    run_test(servers, clients, leftRouter, rightRouter, deltasSec, delaysUsec)
 
-    CLI(network)
+    #CLI(network)
