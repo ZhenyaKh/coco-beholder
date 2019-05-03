@@ -313,7 +313,7 @@ def build_half_dumbbell(network, availableSubnets, hostLiteral, routerName):
 
 def build_dumbbell_network():
     network          = Mininet(build=False)
-    availableSubnets = ipaddress.ip_network(u'11.0.0.0/24').subnets(new_prefix=30)
+    availableSubnets = ipaddress.ip_network(u'11.0.0.0/16').subnets(new_prefix=30)
 
     servers, leftRouter  = build_half_dumbbell(network, availableSubnets, 's', 'r1')
     clients, rightRouter = build_half_dumbbell(network, availableSubnets, 'c', 'r2')
