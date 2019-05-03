@@ -71,7 +71,7 @@ def launch_clients(clients, runsSecond, serverIPs):
 
     if INTERVAL_SEC != 0:
         clientProcesses.append(
-            clients[i].popen(['sudo', '-u', USER, SCHEME_PATH, runsSecond, serverIPs[0], PORT]))
+            clients[0].popen(['sudo', '-u', USER, SCHEME_PATH, runsSecond, serverIPs[0], PORT]))
 
         startEvent.set()
 
@@ -301,6 +301,10 @@ def build_half_dumbbell(network, availableSubnets, hostLiteral, routerName):
         router.  cmd('tc qdisc add dev %s root pfifo limit 1000'   % router.intfs[i])
         hosts[i].cmd('tc qdisc add dev %s root pfifo limit 1000'   % hosts[i].intf())
 
+        # setting arp entries for the entire subnet
+        router.  cmd('arp', '-s', hosts[i].intf().IP(), hosts[i].intf().MAC())
+        hosts[i].cmd('arp', '-s', router.intfs[i].IP(), router.intfs[i].MAC())
+
         # setting the router as the default gateway for the host
         hosts[i].setDefaultRoute('via %s' % router.intfs[i].IP())
 
@@ -328,6 +332,10 @@ def build_dumbbell_network():
     # turning off TCP segmentation offload and UDP fragmentation offload!
     leftRouter. cmd('ethtool -K %s tx off sg off tso off ufo off' % leftRouter. intfs[FLOWS])
     rightRouter.cmd('ethtool -K %s tx off sg off tso off ufo off' % rightRouter.intfs[FLOWS])
+
+    # setting arp entries for the entire subnet consisting of the two routers
+    leftRouter. cmd('arp', '-s', rightRouter.intfs[FLOWS].IP(), rightRouter.intfs[FLOWS].MAC())
+    rightRouter.cmd('arp', '-s', leftRouter.intfs[FLOWS].IP(), leftRouter.intfs[FLOWS].MAC())
 
     # allowing the two halves of the dumbbell to exchange packets
     leftRouter. setDefaultRoute('via %s' % rightRouter.intfs[FLOWS].IP())
