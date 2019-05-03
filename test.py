@@ -6,10 +6,10 @@ import subprocess
 import socket
 import sys
 import random
+import threading
 import ipaddress
 import time
 from time import sleep
-from multiprocessing import Process, Semaphore, Value, Queue
 
 from mininet.topo import Topo
 from mininet.net  import Mininet
@@ -35,25 +35,6 @@ THIRD_PARTY_DIR = 'third_party'
 SCHEME_PATH     = os.path.join(PANTHEON, WRAPPERS_PATH, SCHEME + '.py')
 
 
-class Barrier:
-    def __init__(self, n):
-        self.n       = n
-        self.count   = Value('i', 0)
-        self.mutex   = Semaphore(1)
-        self.barrier = Semaphore(0)
-
-    def wait(self):
-        self.mutex.acquire()
-        self.count.value += 1
-        self.mutex.release()
-
-        if self.count.value == self.n:
-            self.barrier.release()
-
-        self.barrier.acquire()
-        self.barrier.release()
-
-
 #
 # Function kills launched processes and its children
 # param [in] clientProcesses  - popen objects of launched client processes
@@ -72,20 +53,27 @@ def killProcesses(clientProcesses, serverProcesses, tcpdumpProcesses):
 
 
 #
+# Array of popen objects of launched client processes. It is instantiated by launch_clients().
+#
+clientProcesses = []
+#
+# Synchronization object of the main thread and the thread which launches clients
+#
+startEvent = threading.Event()
+#
 # Function launches client processes. The function runs in a separate thread.
 # param [in] clients    - hosts on which the clients are launched
 # param [in] runsSecond - "sender" or "receiver" of the scheme depending on who the clients are
 # param [in] serverIPs  - IP addresses of hosts with servers to which clients connect
 #
-def launch_clients(barrier, conn, clients, runsSecond, serverIPs):
-    benchmarkStart  = timeStart = time.time() # TODO: remove benchmark
-    clientProcesses = []
+def launch_clients(clients, runsSecond, serverIPs):
+    benchmarkStart = timeStart = time.time() # TODO: remove benchmark
 
     if INTERVAL_SEC != 0:
         clientProcesses.append(
             clients[0].popen(['sudo', '-u', USER, SCHEME_PATH, runsSecond, serverIPs[0], PORT]))
 
-        barrier.wait()
+        startEvent.set()
 
         for i in range(1, FLOWS):
             sleep(INTERVAL_SEC - ((time.time() - timeStart) % INTERVAL_SEC))
@@ -97,9 +85,8 @@ def launch_clients(barrier, conn, clients, runsSecond, serverIPs):
             clientProcesses.append(
                 clients[i].popen(['sudo', '-u', USER, SCHEME_PATH, runsSecond, serverIPs[i], PORT]))
 
-        barrier.wait()
+        startEvent.set()
 
-    conn.put(clientProcesses)
     print(time.time() - benchmarkStart)
 
 
@@ -239,18 +226,15 @@ def run_test(servers, clients, leftRouter, rightRouter, deltasSec, delaysUsec):
 
     serverProcesses, serverIPs = launch_servers(servers, runsFirst)
 
-    barrier, conn = Barrier(2), Queue()
-    child = Process(target = launch_clients, args = (barrier, conn, clients, runsSecond, serverIPs))
-    child.start()
-
-    barrier.wait()
+    thread = threading.Thread(target = launch_clients, args = (clients, runsSecond, serverIPs))
+    thread.start()
+    startEvent.wait()
 
     benchmarkStart = time.time() # TODO: remove benchmark
     perform_tc_delay_changes(leftRouter, rightRouter, leftIntf, rightIntf, deltasSec, delaysUsec)
     print(time.time() - benchmarkStart)
 
-    clientProcesses = conn.get(block=True)
-    child.join()
+    thread.join()
     killProcesses(clientProcesses, serverProcesses, tcpdumpProcesses)
 
 
@@ -351,7 +335,7 @@ def build_dumbbell_network():
 
     # setting arp entries for the entire subnet consisting of the two routers
     leftRouter. cmd('arp', '-s', rightRouter.intfs[FLOWS].IP(), rightRouter.intfs[FLOWS].MAC())
-    rightRouter.cmd('arp', '-s', leftRouter. intfs[FLOWS].IP(), leftRouter. intfs[FLOWS].MAC())
+    rightRouter.cmd('arp', '-s', leftRouter.intfs[FLOWS].IP(), leftRouter.intfs[FLOWS].MAC())
 
     # allowing the two halves of the dumbbell to exchange packets
     leftRouter. setDefaultRoute('via %s' % rightRouter.intfs[FLOWS].IP())
