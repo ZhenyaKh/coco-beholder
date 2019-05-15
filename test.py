@@ -1,4 +1,4 @@
-#!/usr/bin/python 
+#!/usr/bin/python
 
 import os
 import signal
@@ -30,6 +30,8 @@ STEP_USEC       = int(sys.argv[10])
 JITTER_USEC     = int(sys.argv[11])
 FLOWS           = int(sys.argv[12])
 INTERVAL_SEC    = int(sys.argv[13])
+SENDER          = 'sender'
+RECEIVER        = 'receiver'
 WRAPPERS_PATH   = 'src/wrappers'
 THIRD_PARTY_DIR = 'third_party'
 SCHEME_PATH     = os.path.join(PANTHEON, WRAPPERS_PATH, SCHEME + '.py')
@@ -37,25 +39,43 @@ SCHEME_PATH     = os.path.join(PANTHEON, WRAPPERS_PATH, SCHEME + '.py')
 
 #
 # Function kills launched processes and its children
-# param [in] clientProcesses  - popen objects of launched client processes
-# param [in] serverProcesses  - popen objects of launched server processes
-# param [in] tcpdumpProcesses - popen objects of tcpdump processes recording on servers and clients
+# param [in] serverPopens     - popen objects of launched server processes
+# param [in] clientPopens     - popen objects of launched client processes
+# param [in] serverDumpPopens - popen objects of tcpdump processes recording on servers
+# param [in] clientDumpPopens - popen objects of tcpdump processes recording on clients
+# param [in] runsFirst        - "sender" or "receiver" of the scheme depending on who servers are
 #
-def killProcesses(clientProcesses, serverProcesses, tcpdumpProcesses):
-    for clientProcess in clientProcesses:
-        os.killpg(os.getpgid(clientProcess.pid), signal.SIGKILL)
+def killProcesses(serverPopens, clientPopens, serverDumpPopens, clientDumpPopens, runsFirst):
+    if runsFirst == SENDER:
+        for serverPopen in serverPopens:
+            os.killpg(os.getpgid(serverPopen.pid), signal.SIGKILL)
 
-    for serverProcess in serverProcesses:
-        os.killpg(os.getpgid(serverProcess.pid), signal.SIGKILL)
+        for clientPopen in clientPopens:
+            os.killpg(os.getpgid(clientPopen.pid), signal.SIGKILL)
 
-    for tcpdumpProcess in tcpdumpProcesses:
-        os.kill(tcpdumpProcess.pid, signal.SIGTERM)
+        for serverDumpPopen in serverDumpPopens:
+            os.kill(serverDumpPopen.pid, signal.SIGTERM)
+
+        for clientDumpPopen in clientDumpPopens:
+            os.kill(clientDumpPopen.pid, signal.SIGTERM)
+    else:
+        for clientPopen in clientPopens:
+            os.killpg(os.getpgid(clientPopen.pid), signal.SIGKILL)
+
+        for serverPopen in serverPopens:
+            os.killpg(os.getpgid(serverPopen.pid), signal.SIGKILL)
+
+        for clientDumpPopen in clientDumpPopens:
+            os.kill(clientDumpPopen.pid, signal.SIGTERM)
+
+        for serverDumpPopen in serverDumpPopens:
+            os.kill(serverDumpPopen.pid, signal.SIGTERM)
 
 
 #
 # Array of popen objects of launched client processes. It is instantiated by launch_clients().
 #
-clientProcesses = []
+clientPopens = []
 #
 # Synchronization object of the main thread and the thread which launches clients
 #
@@ -63,14 +83,14 @@ startEvent = threading.Event()
 #
 # Function launches client processes. The function runs in a separate thread.
 # param [in] clients    - hosts on which the clients are launched
-# param [in] runsSecond - "sender" or "receiver" of the scheme depending on who the clients are
+# param [in] runsSecond - "sender" or "receiver" of the scheme depending on who clients are
 # param [in] serverIPs  - IP addresses of hosts with servers to which clients connect
 #
 def launch_clients(clients, runsSecond, serverIPs):
     benchmarkStart = timeStart = time.time() # TODO: remove benchmark
 
     if INTERVAL_SEC != 0:
-        clientProcesses.append(
+        clientPopens.append(
             clients[0].popen(['sudo', '-u', USER, SCHEME_PATH, runsSecond, serverIPs[0], PORT]))
 
         startEvent.set()
@@ -78,11 +98,11 @@ def launch_clients(clients, runsSecond, serverIPs):
         for i in range(1, FLOWS):
             sleep(INTERVAL_SEC - ((time.time() - timeStart) % INTERVAL_SEC))
 
-            clientProcesses.append(
+            clientPopens.append(
                 clients[i].popen(['sudo', '-u', USER, SCHEME_PATH, runsSecond, serverIPs[i], PORT]))
     else:
         for i in range(0, FLOWS):
-            clientProcesses.append(
+            clientPopens.append(
                 clients[i].popen(['sudo', '-u', USER, SCHEME_PATH, runsSecond, serverIPs[i], PORT]))
 
         startEvent.set()
@@ -93,24 +113,24 @@ def launch_clients(clients, runsSecond, serverIPs):
 #
 # Function launches server processes
 # param [in] servers   - hosts on which the servers are launched
-# param [in] runsFirst - "sender" or "receiver" of the scheme depending on who the servers are
+# param [in] runsFirst - "sender" or "receiver" of the scheme depending on who servers are
 # returns popen objects of launched server processes and IP addresses of the servers
 #
 def launch_servers(servers, runsFirst):
-    serverProcesses = []
-    serverIPs       = []
+    serverPopens = []
+    serverIPs    = []
 
     for server in servers:
-        serverProcess = server.popen(['sudo', '-u', USER, SCHEME_PATH, runsFirst, PORT])
+        serverPopen = server.popen(['sudo', '-u', USER, SCHEME_PATH, runsFirst, PORT])
 
-        serverIPs      .append(server.IP())
-        serverProcesses.append(serverProcess)
+        serverIPs   .append(server.IP())
+        serverPopens.append(serverPopen)
 
         # Check if the server's ready. Maybe, this is not the best way but in Pantheon they just
         # sleep for three seconds after opening all the servers.
         while not server.cmd("lsof -i :%s" % PORT).strip(): pass
 
-    return serverProcesses, serverIPs
+    return serverPopens, serverIPs
 
 
 #
@@ -120,10 +140,10 @@ def launch_servers(servers, runsFirst):
 def whoIsServer():
     runsFirst = subprocess.check_output([SCHEME_PATH, 'run_first']).strip()
 
-    if runsFirst == 'receiver':
-        runsSecond = 'sender'
-    elif runsFirst == 'sender':
-        runsSecond = 'receiver'
+    if runsFirst == RECEIVER:
+        runsSecond = SENDER
+    elif runsFirst == SENDER:
+        runsSecond = RECEIVER
     else:
         sys.exit('Must specify "receiver" or "sender" runs first')
 
@@ -176,8 +196,9 @@ def perform_tc_delay_changes(leftRouter, rightRouter, leftIntf, rightIntf, delta
 # param [in] runsSecond - "sender" or "receiver" of the scheme depending on who the clients are
 # returns popen objects of tcpdump processes recording on servers and clients
 #
-def start_tcpdump_recording(servers, clients, runsFirst, runsSecond):
-    tcpdumpProcesses = []
+def start_tcpdump(servers, clients, runsFirst, runsSecond):
+    serverDumpPopens = []
+    clientDumpPopens = []
 
     for i in range(0, FLOWS):
         serverIntf = servers[i].intf()
@@ -189,17 +210,16 @@ def start_tcpdump_recording(servers, clients, runsFirst, runsSecond):
         serverDump = os.path.join(DIR, "%s-%s-%d.pcap" % (SCHEME, runsFirst,  i + 1))
         clientDump = os.path.join(DIR, "%s-%s-%d.pcap" % (SCHEME, runsSecond, i + 1))
 
-        cmd = 'tcpdump -tt -nn -i %s -Z %s -w %s ' \
-              'host %s and host %s and not arp and not icmp and not icmp6'
+        cmd = 'tcpdump -tt -nn -i %s -Z %s -w %s host %s and host %s and (tcp or udp)'
 
         serverDumpPopen = servers[i].popen(cmd % (serverIntf, USER, serverDump, serverIp, clientIp))
         clientDumpPopen = clients[i].popen(cmd % (clientIntf, USER, clientDump, serverIp, clientIp))
 
-        tcpdumpProcesses.append(clientDumpPopen)
-        tcpdumpProcesses.append(serverDumpPopen)
+        serverDumpPopens.append(serverDumpPopen)
+        clientDumpPopens.append(clientDumpPopen)
 
     sleep(0.5) # in order not to miss the first packets
-    return tcpdumpProcesses
+    return serverDumpPopens, clientDumpPopens
 
 
 #
@@ -222,9 +242,9 @@ def run_test(servers, clients, leftRouter, rightRouter, deltasSec, delaysUsec):
 
     runsFirst, runsSecond = whoIsServer()
 
-    tcpdumpProcesses = start_tcpdump_recording(servers, clients, runsFirst, runsSecond)
+    serverDumpPopens, clientDumpPopens = start_tcpdump(servers, clients, runsFirst, runsSecond)
 
-    serverProcesses, serverIPs = launch_servers(servers, runsFirst)
+    serverPopens, serverIPs = launch_servers(servers, runsFirst)
 
     thread = threading.Thread(target = launch_clients, args = (clients, runsSecond, serverIPs))
     thread.start()
@@ -235,7 +255,7 @@ def run_test(servers, clients, leftRouter, rightRouter, deltasSec, delaysUsec):
     print(time.time() - benchmarkStart)
 
     thread.join()
-    killProcesses(clientProcesses, serverProcesses, tcpdumpProcesses)
+    killProcesses(serverPopens, clientPopens, serverDumpPopens, clientDumpPopens, runsFirst)
 
 
 #
@@ -271,6 +291,14 @@ def generate_steps():
     return deltasSec, delaysUsec
 
 
+#
+# Function generates half a dumbbell topology
+# param [in] network          - full Mininet network
+# param [in] availableSubnets - iterator over still available subnets with prefix length 30
+# param [in] hostLiteral      - letter with which hosts are named, e.g. for x we get x1, x2, x3, ...
+# param [in] routerName       - name of the router interconnecting all the hosts
+# returns all the hosts in the half, the router interconnecting all the hosts in the half
+#
 def build_half_dumbbell(network, availableSubnets, hostLiteral, routerName):
     hosts   = [ None ] * FLOWS
     ipPools = [ None ] * FLOWS
@@ -311,6 +339,10 @@ def build_half_dumbbell(network, availableSubnets, hostLiteral, routerName):
     return hosts, router
 
 
+#
+# Function generates dumbbell topology
+# returns full network, hosts in the left half, hosts in the right half, left router, right router
+#
 def build_dumbbell_network():
     network          = Mininet(build=False)
     availableSubnets = ipaddress.ip_network(u'11.0.0.0/16').subnets(new_prefix=30)
