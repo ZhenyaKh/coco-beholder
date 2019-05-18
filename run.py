@@ -12,6 +12,8 @@ CONFIG_PATH   = 'src/config.yml'
 MAX_DELAY_US  = int(1e8)
 SCHEMES       = 'schemes'
 FLOWS         = 'flows'
+RUNTIME       = 'runtime'
+INTERVAL      = 'interval'
 METADATA_NAME = 'metadata.json'
 
 
@@ -86,8 +88,10 @@ class BlankLinesHelpFormatter (argparse.HelpFormatter):
 def save_metadata(args):
     meta = {}
 
-    meta[SCHEMES] = args.schemes
-    meta[FLOWS  ] = args.flows
+    meta[SCHEMES ] = args.schemes
+    meta[FLOWS   ] = args.flows
+    meta[RUNTIME ] = args.runtime
+    meta[INTERVAL] = args.interval
 
     metadataPath = os.path.join(args.dir, METADATA_NAME)
 

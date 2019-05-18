@@ -5,42 +5,29 @@ import argparse
 import json
 import hashlib
 import matplotlib.pyplot as plt
+import matplotlib.ticker as plticker
+from sys import stderr
+import itertools
 
 from dpkt.pcap import *
 from dpkt.ethernet import *
+from progress.bar import FillingSquaresBar as Bar
 
 FLOWS         = 'flows'
 SCHEMES       = 'schemes'
+RUNTIME       = 'runtime'
 METADATA_NAME = 'metadata.json'
 SENDER        = 'sender'
 RECEIVER      = 'receiver'
-
-#
-#
-#
-def get_base_time(scheme, flows, directory):
-    minBaseTime = float('inf')
-
-    # In reality the first dump in the cycle (scheme-sender-1.pcap) always has the min base time
-    # but we check all the files just to be sure, as it can be done quickly.
-    for flow in range(1, flows + 1):
-        for role in [SENDER, RECEIVER]:
-            dumpPath = os.path.join(directory, '%s-%s-%d.pcap' % (scheme, role, flow))
-
-            with open(dumpPath, 'rb') as dumpFile:
-                reader = Reader(dumpFile)
-
-                try:
-                    baseTime    = iter(reader).next()[0]
-                    minBaseTime = min(minBaseTime, baseTime)
-                except StopIteration:
-                    pass
-
-    return minBaseTime
+LABELS_IN_ROW = 5
+FONT_SIZE     = 12
 
 
 #
-#
+# Function gets IP of sender
+# param [in] receiverDump - the full path of receiver's dump
+# param [in] senderDump   - the full path of sender's dump
+# returns IP of sender
 #
 def get_sender_ip(receiverDump, senderDump):
     senderIP = None
@@ -64,16 +51,26 @@ def get_sender_ip(receiverDump, senderDump):
 
 
 #
-#
+# Function gets packets' timestamps of departures from sender and one-way delays using sender's dump
+# param [in]      dumpPath - the full path of sender's dump
+# param [in]      senderIP - IP of sender
+# param [in]      baseTime - base time to subtract from packets' timestamps of departures
+# param [in, out] arrivals - dictionary <packet hash, unix timestamp of packet arrival to receiver>
+# returns packets' timestamps of departures from sender and one-way delays, number of lost packets
 #
 def analyse_sender_dump(dumpPath, senderIP, baseTime, arrivals):
-    departures = []
-    delays     = []
-    lost       = 0
+    lost     = 0
+    fileSize = os.stat(dumpPath).st_size
+    progress = Bar('sender   dump:', max=fileSize, suffix='%(percent).1f%% in %(elapsed)ds')
+
+    departures, delays      = [], []
+    bytes,      packets     = 0,  0
+    sentBytes,  sentPackets = 0,  0
 
     with open(dumpPath, 'rb') as dump:
         for timestamp, packet in Reader(dump):
-            ip = Ethernet(packet).data
+            size = len(packet)
+            ip   = Ethernet(packet).data
 
             if ip.src == senderIP:
                 digest = hashlib.sha1(str(ip.data) + str(ip.id)).hexdigest()
@@ -85,33 +82,81 @@ def analyse_sender_dump(dumpPath, senderIP, baseTime, arrivals):
                 else:
                     lost += 1
 
+                sentBytes   += size
+                sentPackets += 1
+
+            bytes   += size
+            packets += 1
+            progress.goto(bytes)
+
+    progress.goto(fileSize)
+    progress.finish()
+
+    print("Total: %d pkts/%d b. Sent by sender: %d pkts/%d b." % (packets,     bytes,
+                                                                  sentPackets, sentBytes))
     return departures, delays, lost
 
 
 #
-#
+# Function gets dictionary <packet hash, unix timestamp of packet arrival> from receiver's dump
+# param [in] dumpPath - the full path of receiver's dump
+# param [in] senderIP - IP of sender
+# returns dictionary <packet hash, unix timestamp of packet arrival to receiver>
 #
 def analyse_receiver_dump(dumpPath, senderIP):
     arrivals = {}
+    fileSize = os.stat(dumpPath).st_size
+    progress = Bar('receiver dump:', max=fileSize, suffix='%(percent).1f%% in %(elapsed)ds')
+
+    bytes,     packets     = 0, 0
+    sentBytes, sentPackets = 0, 0
 
     with open(dumpPath, 'rb') as dump:
         for timestamp, packet in Reader(dump):
-            ip = Ethernet(packet).data
+            size = len(packet)
+            ip   = Ethernet(packet).data
 
             if ip.src == senderIP:
                 digest = hashlib.sha1(str(ip.data) + str(ip.id)).hexdigest()
 
                 if digest in arrivals:
-                    print("ERROR: Duplicate sha1 digest of two packets was found!")
+                    stderr.write("ERROR: Duplicate sha1 digest of two packets was found!\n")
                     del arrivals[digest]
                 else:
                     arrivals[digest] = timestamp
 
+                sentBytes   += size
+                sentPackets += 1
+
+            bytes   += size
+            packets += 1
+            progress.goto(bytes)
+
+    progress.goto(fileSize)
+    progress.finish()
+
+    print("Total: %d pkts/%d b. Sent by sender: %d pkts/%d b." % (packets,     bytes,
+                                                                  sentPackets, sentBytes))
     return arrivals
 
 
 #
+# Function is used to make labels of flows have horizontal layout, rather than vertical (default)
+# param [in] items - array of labels/handles should be supplied here
+# param [in] ncol  - required number of labels per row
+# returns labels/handles sorted in such a way that they will have horizontal layout
 #
+def flip(items, ncol):
+    return list(itertools.chain(*[items[i::ncol] for i in range(ncol)]))
+
+
+#
+# Function gets values to plot: packets' timestamps of departures from sender and one-way delays
+# param [in] scheme    - name of the scheme
+# param [in] flow      - flow id
+# param [in] directory - directory with dumps
+# param [in] baseTime  - base time
+# returns packets' timestamps (base time subtracted) of departures from sender and one-way delays
 #
 def get_delays(scheme, flow, directory, baseTime):
     receiverDump = os.path.join(directory, '%s-receiver-%d.pcap' % (scheme, flow))
@@ -126,19 +171,51 @@ def get_delays(scheme, flow, directory, baseTime):
     phantoms = len(arrivals)
 
     if phantoms != 0:
-        print("WARNING: %d packets present at receiver but not at sender" % phantoms)
+        stderr.write("WARNING: %d packets sent by sender are not recorded at sender\n" % phantoms)
         del arrivals
 
     if lost != 0:
-        print("WARNING: %d packets lost" % lost)
+        stderr.write("WARNING: %d packets sent by sender are not recorded at receiver\n" % lost)
 
     return departures, delays
 
 
 #
+# Function gets the minimum of timestamps of the first packets of all dumps to serve as base time
+# param [in] scheme    - name of the scheme
+# param [in] flows     - number of flows
+# param [in] directory - directory with dumps
+# returns base time
 #
+def get_base_time(scheme, flows, directory):
+    minBaseTime = float('inf')
+
+    # In reality the first dump in the cycle (scheme-sender-1.pcap) always has the min base time
+    # but we check all the files just to be sure, as it can be done quickly.
+    for flow in range(1, flows + 1):
+        for role in [SENDER, RECEIVER]:
+            dumpPath = os.path.join(directory, '%s-%s-%d.pcap' % (scheme, role, flow))
+
+            with open(dumpPath, 'rb') as dumpFile:
+                reader = Reader(dumpFile)
+
+                try:
+                    baseTime    = iter(reader).next()[0]
+                    minBaseTime = min(minBaseTime, baseTime)
+                except StopIteration:
+                    pass
+
+    return minBaseTime
+
+
 #
-def plot_delay(scheme, flows, directory):
+# Function generates png plot of per-packer one-way delay of traffic sent from senders to receivers
+# param [in] scheme    - name of the scheme
+# param [in] flows     - number of flows
+# param [in] runtime   - runtime of testing in seconds
+# param [in] directory - directory with dumps
+#
+def plot_delay(scheme, flows, runtime, directory):
     baseTime = get_base_time(scheme, flows, directory)
 
     figure, ax = plt.subplots(figsize=(16, 9))
@@ -147,21 +224,28 @@ def plot_delay(scheme, flows, directory):
         print("%s scheme, flow %d:" % (scheme, flow))
 
         departures, delays = get_delays(scheme, flow, directory, baseTime)
-        ax.plot(departures, [delay * 1000 for delay in delays])
 
-    ax.grid()
+        label = ('Flow %s (no packets)' % flow) if len(departures) == 0 else ('Flow %s' % flow)
+        ax.scatter(departures, [i * 1000 for i in delays], s=1, marker='.', label=label)
+
     ax.ticklabel_format(useOffset=False, style='plain') # turn off scientific notation for both axes
-    ax.set(xlabel='Time (s)', ylabel='One-Way-Delay (ms)')
-    plt.tight_layout()
 
-    delayGraphPath = os.path.join(directory, "%s-delay.png" % scheme)
-    figure.savefig(delayGraphPath)
+    locator = plticker.MultipleLocator(base=1) # enforce tick for each second on x axis
+    ax.xaxis.set_major_locator(locator)
+
+    ax.set_xlim(0, runtime)
+    ax.set_xlabel('Time (s)', fontsize=FONT_SIZE)
+    ax.set_ylabel('Per-packet one-way delay (ms)', fontsize=FONT_SIZE)
+    ax.grid()
+
+    handles, labels = ax.get_legend_handles_labels()
+    legend = ax.legend(flip(handles, LABELS_IN_ROW), flip(labels, LABELS_IN_ROW),
+                       ncol=LABELS_IN_ROW, bbox_to_anchor=(0.5, -0.1), loc='upper center',
+                       fontsize=FONT_SIZE, scatterpoints=1, markerscale=10, handletextpad=0)
+
+    delayPlotPath = os.path.join(directory, "%s-delay.png" % scheme)
+    figure.savefig(delayPlotPath, bbox_extra_artists=(legend,), bbox_inches='tight', pad_inches=0.2)
     plt.close(figure)
-
-
-
-
-
 
 
 #
@@ -206,5 +290,8 @@ if __name__ == '__main__':
     meta = load_metadata(args.dir)
 
     for scheme in meta[SCHEMES]:
-        plot_delay(scheme, meta[FLOWS], args.dir)
+        print("~~~%s~~~" % ('~' * len(scheme)))
+        print("|  %s  |" % scheme.upper())
+        print("~~~%s~~~" % ('~' * len(scheme)))
 
+        plot_delay(scheme, meta[FLOWS], meta[RUNTIME], args.dir)
