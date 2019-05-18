@@ -17,6 +17,8 @@ from mininet.log  import setLogLevel, info
 from mininet.cli  import CLI
 
 PORT            = '50000'
+SUPERNET        = u'11.0.0.0/16'
+SUBNET_PREFIX   = 30
 USER            = sys.argv[1]
 SCHEME          = sys.argv[2]
 DIR             = sys.argv[3]
@@ -137,7 +139,7 @@ def launch_servers(servers, runsFirst):
 # Function determines who runs first: the sender or the receiver of the scheme
 # returns sender and receiver in the order of running
 #
-def whoIsServer():
+def who_is_server():
     runsFirst = subprocess.check_output([SCHEME_PATH, 'run_first']).strip()
 
     if runsFirst == RECEIVER:
@@ -223,42 +225,6 @@ def start_tcpdump(servers, clients, runsFirst, runsSecond):
 
 
 #
-# Function runs testing for the scheme
-# param [in] servers     - the left hosts of the dumbbell topology
-# param [in] clients     - the right hosts of the dumbbell topology
-# param [in] leftRouter  - the left router interconnecting servers of the dumbbell topology
-# param [in] rightRouter - the right router interconnecting clients of the dumbbell topology
-# param [in] deltasSec   - array of delta times in seconds
-# param [in] delaysUsec  - array of delays in microseconds corresponding to the array of delta times
-#
-def run_test(servers, clients, leftRouter, rightRouter, deltasSec, delaysUsec):
-    leftIntf, rightIntf = leftRouter.intfs[FLOWS], rightRouter.intfs[FLOWS]
-
-    leftRouter.cmd ('tc qdisc add dev %s root netem delay %dus %dus rate %sMbit' %
-                   (leftIntf,  delaysUsec[0], JITTER_USEC, RATE_MBITS))
-
-    rightRouter.cmd('tc qdisc add dev %s root netem delay %dus %dus rate %sMbit' %
-                   (rightIntf, delaysUsec[0], JITTER_USEC, RATE_MBITS))
-
-    runsFirst, runsSecond = whoIsServer()
-
-    serverDumpPopens, clientDumpPopens = start_tcpdump(servers, clients, runsFirst, runsSecond)
-
-    serverPopens, serverIPs = launch_servers(servers, runsFirst)
-
-    thread = threading.Thread(target = launch_clients, args = (clients, runsSecond, serverIPs))
-    thread.start()
-    startEvent.wait()
-
-    benchmarkStart = time.time() # TODO: remove benchmark
-    perform_tc_delay_changes(leftRouter, rightRouter, leftIntf, rightIntf, deltasSec, delaysUsec)
-    print(time.time() - benchmarkStart)
-
-    thread.join()
-    killProcesses(serverPopens, clientPopens, serverDumpPopens, clientDumpPopens, runsFirst)
-
-
-#
 # Function generates arrays of delta times and corresponding delays
 # returns arrays of delta times in seconds and corresponding delays in microseconds
 #
@@ -289,6 +255,42 @@ def generate_steps():
         delaysUsec += [ delayUsec ]
 
     return deltasSec, delaysUsec
+
+
+#
+# Function runs testing for the scheme
+# param [in] servers     - the left hosts of the dumbbell topology
+# param [in] clients     - the right hosts of the dumbbell topology
+# param [in] leftRouter  - the left router interconnecting servers of the dumbbell topology
+# param [in] rightRouter - the right router interconnecting clients of the dumbbell topology
+# param [in] runsFirst   - "sender" or "receiver" of the scheme depending on who the servers are
+# param [in] runsSecond  - "sender" or "receiver" of the scheme depending on who the clients are
+#
+def run_test(servers, clients, leftRouter, rightRouter, runsFirst, runsSecond):
+    deltasSec, delaysUsec = generate_steps()
+
+    leftIntf, rightIntf   = leftRouter.intfs[FLOWS], rightRouter.intfs[FLOWS]
+
+    leftRouter.cmd ('tc qdisc add dev %s root netem delay %dus %dus rate %sMbit' %
+                   (leftIntf,  delaysUsec[0], JITTER_USEC, RATE_MBITS))
+
+    rightRouter.cmd('tc qdisc add dev %s root netem delay %dus %dus rate %sMbit' %
+                   (rightIntf, delaysUsec[0], JITTER_USEC, RATE_MBITS))
+
+    serverDumpPopens, clientDumpPopens = start_tcpdump(servers, clients, runsFirst, runsSecond)
+
+    serverPopens, serverIPs = launch_servers(servers, runsFirst)
+
+    thread = threading.Thread(target = launch_clients, args = (clients, runsSecond, serverIPs))
+    thread.start()
+    startEvent.wait()
+
+    benchmarkStart = time.time() # TODO: remove benchmark
+    perform_tc_delay_changes(leftRouter, rightRouter, leftIntf, rightIntf, deltasSec, delaysUsec)
+    print(time.time() - benchmarkStart)
+
+    thread.join()
+    killProcesses(serverPopens, clientPopens, serverDumpPopens, clientDumpPopens, runsFirst)
 
 
 #
@@ -341,11 +343,16 @@ def build_half_dumbbell(network, availableSubnets, hostLiteral, routerName):
 
 #
 # Function generates dumbbell topology
+# param [in] runsFirst - "sender" or "receiver" of the scheme depending on who servers are
 # returns full network, hosts in the left half, hosts in the right half, left router, right router
 #
-def build_dumbbell_network():
+def build_dumbbell_network(runsFirst):
     network          = Mininet(build=False)
-    availableSubnets = ipaddress.ip_network(u'11.0.0.0/16').subnets(new_prefix=30)
+    availableSubnets = ipaddress.ip_network(SUPERNET).subnets(new_prefix=SUBNET_PREFIX)
+
+    # ensuring that IP of sender is always higher than IP of receiver for future dissection of dumps
+    if runsFirst == SENDER:
+        availableSubnets = reversed(list(availableSubnets))
 
     servers, leftRouter  = build_half_dumbbell(network, availableSubnets, 's', 'r1')
     clients, rightRouter = build_half_dumbbell(network, availableSubnets, 'c', 'r2')
@@ -383,12 +390,12 @@ def build_dumbbell_network():
 if __name__ == '__main__':
     random.seed(1) # TODO: make seed parameter
 
-    network, servers, clients, leftRouter, rightRouter = build_dumbbell_network()
+    runsFirst, runsSecond = who_is_server()
+
+    network, servers, clients, leftRouter, rightRouter = build_dumbbell_network(runsFirst)
 
     subprocess.call([SCHEME_PATH, 'setup_after_reboot'])
 
-    deltasSec, delaysUsec = generate_steps()
-
-    run_test(servers, clients, leftRouter, rightRouter, deltasSec, delaysUsec)
+    run_test(servers, clients, leftRouter, rightRouter, runsFirst, runsSecond)
 
     #CLI(network)

@@ -17,7 +17,7 @@ parser.add_argument('-d', '--data', action='store_true',
                     help='delete statistics data files')
 
 parser.add_argument('-p', '--pcap', '--pcaps', action='store_true',
-                    help='delete pcap files')
+                    help='delete pcap files and accompanying metadata file')
 
 parser.add_argument('-s', '--senders', '--sender', action='store_true',
                     help='among chosen files, delete only files of senders')
@@ -58,6 +58,7 @@ for file in files:
     if   args.graph and file.endswith('.png') : toDelete = True 
     elif args.data  and file.endswith('.data'): toDelete = True
     elif args.pcap  and file.endswith('.pcap'): toDelete = True
+    elif args.pcap  and file.endswith('.json'): toDelete = True
 
     if args.senders and 'sender' not in file:
         toDelete = False

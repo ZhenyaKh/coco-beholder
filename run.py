@@ -6,9 +6,14 @@ import argparse
 import yaml
 import sys
 import subprocess
+import json
 
-CONFIG_PATH  = 'src/config.yml'
-MAX_DELAY_US = int(1e8)
+CONFIG_PATH   = 'src/config.yml'
+MAX_DELAY_US  = int(1e8)
+SCHEMES       = 'schemes'
+FLOWS         = 'flows'
+METADATA_NAME = 'metadata.json'
+
 
 #
 # Function parses time string in the formats: N (milliseconds assumed), Nus, Nms, Ns
@@ -56,7 +61,7 @@ def verify_schemes(schemes, allSchemes):
 #
 def parse_config(pantheonDir):
     with open(os.path.join(pantheonDir, CONFIG_PATH)) as config:
-        return yaml.load(config)['schemes'].keys()
+        return yaml.load(config)[SCHEMES].keys()
 
 
 #
@@ -72,6 +77,22 @@ class BlankLinesHelpFormatter (argparse.HelpFormatter):
     #
     def _split_lines(self, text, width):
         return super(BlankLinesHelpFormatter, self)._split_lines(text, width) + ['']
+
+
+#
+# Function saves metadata of the testing
+# param [in] args - arguments with which the testing should be launched
+#
+def save_metadata(args):
+    meta = {}
+
+    meta[SCHEMES] = args.schemes
+    meta[FLOWS  ] = args.flows
+
+    metadataPath = os.path.join(args.dir, METADATA_NAME)
+
+    with open(metadataPath, 'w') as metadataFile:
+        json.dump(meta, metadataFile, sort_keys=True, indent=4, separators=(',', ': '))
 
 
 #        
@@ -172,12 +193,13 @@ def parse_arguments():
 # Entry function
 #
 if __name__ == '__main__':
-    args = parse_arguments()
-
-    if os.geteuid()==0:
+    if os.geteuid() == 0:
         sys.exit("Please, do not run as root. We need to learn your user name.")
 
     user = getpass.getuser()
+    args = parse_arguments()
+
+    save_metadata(args)
 
     for scheme in args.schemes:
         subprocess.call('sudo mn -c --verbosity=output', shell=True)
@@ -190,5 +212,3 @@ if __name__ == '__main__':
 
     subprocess.call('sudo mn -c --verbosity=output', shell=True)
     print("Done.")
-
-
