@@ -5,75 +5,96 @@ import sys
 import os.path
 import os
 
-parser = argparse.ArgumentParser(description='The script cleans data directory.')
+SENDER   = 'sender'
+RECEIVER = 'receiver'
+PCAP     = '.pcap'
+JSON     = '.json'
+PNG      = '.png'
+
+parser = argparse.ArgumentParser(description=
+'The script cleans two directories with data. The script deletes only pcap/json/png files and '
+'does not touch any subdirectories. If any of the two data directories gets completely empty '
+'the script deletes the directory.')
 
 parser.add_argument('-a', '--all', action='store_true',
-                    help='delete pcap, graph and data files. Same as -gdp.')
+                    help='delete all files in both directories, same as -dg')
+
+parser.add_argument('-d', '--dump', '--dumps', action='store_true',
+                    help='delete all files in directory with dumps')
 
 parser.add_argument('-g', '--graph', '--graphs', action='store_true',
-                    help='delete graph files')
-
-parser.add_argument('-d', '--data', action='store_true',
-                    help='delete statistics data files')
-
-parser.add_argument('-p', '--pcap', '--pcaps', action='store_true',
-                    help='delete pcap files and accompanying metadata file')
+                    help='delete all files in directory with graphs')
 
 parser.add_argument('-s', '--senders', '--sender', action='store_true',
-                    help='among chosen files, delete only files of senders')
+                    help='among chosen files, delete files belonging exclusively to senders')
 
 parser.add_argument('-r', '--receivers', '--receiver', action='store_true',
-                    help='among chosed files, delete only files of receivers')
+                    help='among chosen files, delete files belonging exclusively to receivers')
 
-parser.add_argument('--dir', default='data',
-                    help='directory with files to clean, default is "data"')
+parser.add_argument('-m', '--mutual', action='store_true',
+                    help='among chosen files, delete files common for senders and receivers')
+
+parser.add_argument('-f1', '--folder1', default='dumps',
+                    help='directory with dumps to clean, default is "dumps"')
+
+parser.add_argument('-f2', '--folder2', default='graphs',
+                    help='directory with graphs to clean, default is "graphs"')
 
 args = parser.parse_args()
 
-if args.receivers and args.senders:
-    sys.exit('Error: -s and -r arguments are mutually exclusive')
+if args.all and (args.dump or args.graph):
+    sys.exit('Error: argument -a is mutually exclusive with argumnets -d, -g')
 
-if args.all and (args.graph or args.data or args.pcap):
-    sys.exit('Error: argument -a is mutually exclusive with argumnets -g, -d, -p')
+if not args.all and not args.dump and not args.graph:
+    sys.exit('Error: argument -a or at least one of arguments -d, -g should be chosen')
 
-if not args.all and not args.graph and not args.data and not args.pcap:
-    sys.exit('Error: argument -a or at least one of arguments -g, -d, -p should be chosen')
+directories = []
 
-dirAbsPath = os.path.realpath(os.path.expanduser(args.dir))
-if not os.path.exists(dirAbsPath):
-    sys.exit('Directory %s does not exist' % dirAbsPath)
+if args.all or args.dump:
+    dumpsDirPath = os.path.realpath(os.path.expanduser(args.folder1))
+    if os.path.exists(dumpsDirPath):
+        directories.append(dumpsDirPath)
+    else:
+        sys.stderr.write('\nWARNING: Directory does not exist: %s\n\n' % dumpsDirPath)
 
-files = [f for f in os.listdir(dirAbsPath) if os.path.isfile(os.path.join(dirAbsPath, f))]
-
-if args.all:
-    args.graph = True
-    args.data  = True
-    args.pcap  = True
+if args.all or args.graph:
+    graphsDirPath = os.path.realpath(os.path.expanduser(args.folder2))
+    if os.path.exists(graphsDirPath):
+        directories.append(graphsDirPath)
+    else:
+        sys.stderr.write('\nWARNING: Directory does not exist: %s\n\n' % graphsDirPath)
 
 filesToDelete = []
 
-for file in files: 
-    toDelete = False
+for directory in directories:
+    files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
-    if   args.graph and file.endswith('.png') : toDelete = True 
-    elif args.data  and file.endswith('.data'): toDelete = True
-    elif args.pcap  and file.endswith('.pcap'): toDelete = True
-    elif args.pcap  and file.endswith('.json'): toDelete = True
+    for file in files:
+        if not file.endswith(PCAP) and not file.endswith(JSON) and not file.endswith(PNG):
+            continue
 
-    if args.senders and 'sender' not in file:
-        toDelete = False
+        if SENDER in file:
+            if args.senders:
+                filesToDelete.append(os.path.join(directory, file))
+        elif RECEIVER in file:
+            if args.receivers:
+                filesToDelete.append(os.path.join(directory, file))
+        else:
+            if args.mutual:
+                filesToDelete.append(os.path.join(directory, file))
 
-    if args.receivers and 'receiver' not in file:
-        toDelete = False
+        if not args.senders and not args.receivers and not args.mutual:
+            filesToDelete.append(os.path.join(directory, file))
 
-    if toDelete:
-        fileAbsPath = os.path.join(dirAbsPath, file)
-        filesToDelete.append(fileAbsPath)
-        os.remove(fileAbsPath)
+for file in filesToDelete:
+    os.remove(file)
 
 print("The following files have been deleted:")
 print("======================================")
 print("\n".join(filesToDelete))
 print("======================================")
 
-
+for directory in directories:
+    if len(os.listdir(directory)) == 0:
+        os.rmdir(directory)
+        print("Directory has been deleted as completely empty: %s" % directory)

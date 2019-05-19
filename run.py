@@ -105,10 +105,10 @@ def save_metadata(args):
 #
 def parse_arguments():
     parser = argparse.ArgumentParser(formatter_class=BlankLinesHelpFormatter, description=
-    'The script runs tests and outputs pcap-files captured at sender and receiver to '
-    'a specified directory.')
+    'The script runs testing for congestion control schemes and outputs pcap-files '
+    'captured at senders and receivers of the schemes to a specified directory.')
 
-    parser.add_argument('-d', '--dir', default='data', help='output directory, default is "data"')
+    parser.add_argument('-d', '--dir', default='dumps', help='output directory, default is "dumps"')
 
     parser.add_argument('-a', '--all', action='store_true',
                         help='test all schemes')

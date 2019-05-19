@@ -210,12 +210,13 @@ def get_base_time(scheme, flows, directory):
 
 #
 # Function generates png plot of per-packer one-way delay of traffic sent from senders to receivers
-# param [in] scheme    - name of the scheme
-# param [in] flows     - number of flows
-# param [in] runtime   - runtime of testing in seconds
-# param [in] directory - directory with dumps
+# param [in] scheme          - name of the scheme
+# param [in] flows           - number of flows
+# param [in] runtime         - runtime of testing in seconds
+# param [in] directory       - directory with dumps
+# param [in] outputDirectory - output directory for plots
 #
-def plot_delay(scheme, flows, runtime, directory):
+def plot_delay(scheme, flows, runtime, directory, outputDirectory):
     baseTime = get_base_time(scheme, flows, directory)
 
     figure, ax = plt.subplots(figsize=(16, 9))
@@ -243,7 +244,7 @@ def plot_delay(scheme, flows, runtime, directory):
                        ncol=LABELS_IN_ROW, bbox_to_anchor=(0.5, -0.1), loc='upper center',
                        fontsize=FONT_SIZE, scatterpoints=1, markerscale=10, handletextpad=0)
 
-    delayPlotPath = os.path.join(directory, "%s-delay.png" % scheme)
+    delayPlotPath = os.path.join(outputDirectory, "%s-delay.png" % scheme)
     figure.savefig(delayPlotPath, bbox_extra_artists=(legend,), bbox_inches='tight', pad_inches=0.2)
     plt.close(figure)
 
@@ -266,10 +267,13 @@ def load_metadata(directoryPath):
 #
 def parse_arguments():
     parser = argparse.ArgumentParser(description=
-    'The script creates statistics files and plots graphs for all pcap-files in the directory.')
+    'The script generates graphs and stats for pcap-files captured during testing.')
 
-    parser.add_argument('--dir', default='data', help=
-    'Directory with input pcap-files. Stats and graphs will be output to it. Default is "data".')
+    parser.add_argument('-d', '--dir', default='dumps',
+                        help='directory with input pcap-files, default is "dumps"')
+
+    parser.add_argument('-o', '--output-dir', default='graphs',
+                        help='directory with output files, default is "graphs"')
 
     args = parser.parse_args()
 
@@ -277,6 +281,11 @@ def parse_arguments():
 
     if not os.path.exists(args.dir):
         sys.exit('Directory %s does not exist' % args.dir)
+
+    args.output_dir = os.path.realpath(os.path.expanduser(args.output_dir))
+
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
 
     return args
 
@@ -294,4 +303,4 @@ if __name__ == '__main__':
         print("|  %s  |" % scheme.upper())
         print("~~~%s~~~" % ('~' * len(scheme)))
 
-        plot_delay(scheme, meta[FLOWS], meta[RUNTIME], args.dir)
+        plot_delay(scheme, meta[FLOWS], meta[RUNTIME], args.dir, args.output_dir)
