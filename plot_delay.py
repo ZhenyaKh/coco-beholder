@@ -6,7 +6,6 @@ import json
 import hashlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
-from sys import stderr
 import itertools
 
 from dpkt.pcap import *
@@ -21,6 +20,7 @@ SENDER        = 'sender'
 RECEIVER      = 'receiver'
 LABELS_IN_ROW = 5
 FONT_SIZE     = 12
+UTF8          = 'utf-8'
 
 
 #
@@ -52,20 +52,24 @@ def get_sender_ip(receiverDump, senderDump):
 
 #
 # Function gets packets' timestamps of departures from sender and one-way delays using sender's dump
-# param [in]      dumpPath - the full path of sender's dump
-# param [in]      senderIP - IP of sender
-# param [in]      baseTime - base time to subtract from packets' timestamps of departures
-# param [in, out] arrivals - dictionary <packet hash, unix timestamp of packet arrival to receiver>
-# returns packets' timestamps of departures from sender and one-way delays, number of lost packets
+# param [in] dumpPath            - the full path of sender's dump
+# param [in] senderIP            - IP of sender
+# param [in] baseTime            - base time to subtract from packets' timestamps of departures
+# param [in, out] arrivals       - dictionary <packet hash, unix time of packet arrival to receiver>
+# param [in] receiverSentBytes   - number of bytes sent from sender, recorded at receiver
+# param [in] receiverSentPackets - number of packets sent from sender, recorded at receiver
+# returns packets' timestamps of departures from sender, packets' one-way delays,
+# number of bytes/packets sent from sender, recorded at receiver but not at sender
 #
-def analyse_sender_dump(dumpPath, senderIP, baseTime, arrivals):
-    lost     = 0
+def analyse_sender_dump(dumpPath, senderIP, baseTime, arrivals, receiverSentBytes,
+                                                                receiverSentPackets):
     fileSize = os.stat(dumpPath).st_size
     progress = Bar('sender   dump:', max=fileSize, suffix='%(percent).1f%% in %(elapsed)ds')
 
-    departures, delays      = [], []
-    bytes,      packets     = 0,  0
-    sentBytes,  sentPackets = 0,  0
+    departures,   delays         = [],                []
+    bytes,        packets        = 0,                 0
+    sentBytes,    sentPackets    = 0,                 0
+    phantomBytes, phantomPackets = receiverSentBytes, receiverSentPackets
 
     with open(dumpPath, 'rb') as dump:
         for timestamp, packet in Reader(dump):
@@ -78,9 +82,10 @@ def analyse_sender_dump(dumpPath, senderIP, baseTime, arrivals):
                 if digest in arrivals:
                     departures.append(timestamp - baseTime)
                     delays.append(arrivals[digest] - timestamp)
+
                     del arrivals[digest]
-                else:
-                    lost += 1
+                    phantomBytes   -= size
+                    phantomPackets -=1
 
                 sentBytes   += size
                 sentPackets += 1
@@ -92,16 +97,18 @@ def analyse_sender_dump(dumpPath, senderIP, baseTime, arrivals):
     progress.goto(fileSize)
     progress.finish()
 
-    print("Total: %d pkts/%d b. Sent by sender: %d pkts/%d b." % (packets,     bytes,
-                                                                  sentPackets, sentBytes))
-    return departures, delays, lost
+    print("Total: %d pkts/%d bytes, from sender: %d pkts/%d bytes\n" % (packets,     bytes,
+                                                                        sentPackets, sentBytes))
+
+    return departures, delays, sentBytes, sentPackets, phantomBytes, phantomPackets
 
 
 #
-# Function gets dictionary <packet hash, unix timestamp of packet arrival> from receiver's dump
+# Function gets dictionary <packet hash, unix time of packet arrival> from receiver's dump
 # param [in] dumpPath - the full path of receiver's dump
 # param [in] senderIP - IP of sender
-# returns dictionary <packet hash, unix timestamp of packet arrival to receiver>
+# returns dictionary <packet hash, unix time of packet arrival to receiver>,
+# number of bytes/packets sent from sender, recorded at receiver
 #
 def analyse_receiver_dump(dumpPath, senderIP):
     arrivals = {}
@@ -120,7 +127,7 @@ def analyse_receiver_dump(dumpPath, senderIP):
                 digest = hashlib.sha1(str(ip.data) + str(ip.id)).hexdigest()
 
                 if digest in arrivals:
-                    stderr.write("ERROR: Duplicate sha1 digest of two packets was found!\n")
+                    print("ERROR: Duplicate sha1 digest of two packets was found!")
                     del arrivals[digest]
                 else:
                     arrivals[digest] = timestamp
@@ -135,9 +142,9 @@ def analyse_receiver_dump(dumpPath, senderIP):
     progress.goto(fileSize)
     progress.finish()
 
-    print("Total: %d pkts/%d b. Sent by sender: %d pkts/%d b." % (packets,     bytes,
-                                                                  sentPackets, sentBytes))
-    return arrivals
+    print("Total: %d pkts/%d bytes, from sender: %d pkts/%d bytes\n" % (packets,     bytes,
+                                                                        sentPackets, sentBytes))
+    return arrivals, sentBytes, sentPackets
 
 
 #
@@ -164,18 +171,35 @@ def get_delays(scheme, flow, directory, baseTime):
 
     senderIP = get_sender_ip(receiverDump, senderDump)
 
-    arrivals = analyse_receiver_dump(receiverDump, senderIP)
+    arrivals, receiverSentBytes, receiverSentPackets = analyse_receiver_dump(receiverDump, senderIP)
 
-    departures, delays, lost = analyse_sender_dump(senderDump, senderIP, baseTime, arrivals)
+    departures,      delays,            \
+    senderSentBytes, senderSentPackets, \
+    phantomsBytes,   phantomPackets = analyse_sender_dump(senderDump,        senderIP,
+                                                          baseTime,          arrivals,
+                                                          receiverSentBytes, receiverSentPackets)
+    if phantomPackets != len(arrivals):
+        sys.exit("insanity") # assert
+    del arrivals
 
-    phantoms = len(arrivals)
+    totalSentBytes   = senderSentBytes   + phantomsBytes
+    totalSentPackets = senderSentPackets + phantomPackets
 
-    if phantoms != 0:
-        stderr.write("WARNING: %d packets sent by sender are not recorded at sender\n" % phantoms)
-        del arrivals
+    lostSentBytes    = totalSentBytes    - receiverSentBytes
+    lostSentPackets  = totalSentPackets  - receiverSentPackets
 
-    if lost != 0:
-        stderr.write("WARNING: %d packets sent by sender are not recorded at receiver\n" % lost)
+    print((u"\u2665 Union of data from sender recorded on both sides: %d pkts/%d bytes"       %
+          (totalSentPackets, totalSentBytes)).encode(UTF8))
+
+    print((u"\u2666 Subset of \u2665 which was not recorded at sender    : %d pkts/%d bytes"  %
+          (phantomPackets, phantomsBytes)).encode(UTF8))
+
+    print((u"\u2663 Subset of \u2665 which was not recorded at receiver  : %d pkts/%d bytes"  %
+          (lostSentPackets, lostSentBytes)).encode(UTF8))
+
+    if totalSentBytes != 0:
+        print((u"\u2660 Loss (ratio of \u2663 bytes to \u2665 bytes)              : %.2f%%\n" %
+             (float(lostSentBytes) / totalSentBytes * 100)).encode(UTF8))
 
     return departures, delays
 
@@ -222,7 +246,7 @@ def plot_delay(scheme, flows, runtime, directory, outputDirectory):
     figure, ax = plt.subplots(figsize=(16, 9))
 
     for flow in range(1, flows + 1):
-        print("%s scheme, flow %d:" % (scheme, flow))
+        print("\033[1m%s scheme, flow %d:\033[0m\n" % (scheme, flow)) # bold font in terminal
 
         departures, delays = get_delays(scheme, flow, directory, baseTime)
 
@@ -299,8 +323,8 @@ if __name__ == '__main__':
     meta = load_metadata(args.dir)
 
     for scheme in meta[SCHEMES]:
-        print("~~~%s~~~" % ('~' * len(scheme)))
-        print("|  %s  |" % scheme.upper())
-        print("~~~%s~~~" % ('~' * len(scheme)))
+        print("~~~%s~~~"   % ('~' * len(scheme)))
+        print("|  %s  |"   % scheme.upper())
+        print("~~~%s~~~\n" % ('~' * len(scheme)))
 
         plot_delay(scheme, meta[FLOWS], meta[RUNTIME], args.dir, args.output_dir)
