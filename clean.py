@@ -13,8 +13,8 @@ PNG      = '.png'
 
 parser = argparse.ArgumentParser(description=
 'The script cleans two directories with data. The script deletes only pcap/json/png files and '
-'does not touch any subdirectories. If any of the two data directories gets completely empty '
-'the script deletes the directory.')
+'does not touch any subdirectories. If any of chosen data directories gets completely empty '
+'the script also deletes the directory.')
 
 parser.add_argument('-a', '--all', action='store_true',
                     help='delete all files in both directories, same as -dg')
