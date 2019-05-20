@@ -4,9 +4,11 @@ import os
 import argparse
 import json
 import hashlib
+import itertools
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
-import itertools
 
 from dpkt.pcap import *
 from dpkt.ethernet import *
