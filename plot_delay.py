@@ -261,6 +261,7 @@ def plot_delay(scheme, flows, runtime, directory, outputDirectory):
     ax.set_xlim(0, runtime)
     ax.set_xlabel('Time (s)', fontsize=FONT_SIZE)
     ax.set_ylabel('Per-packet one-way delay (ms)', fontsize=FONT_SIZE)
+    ax.set_title(scheme.upper(), fontsize=FONT_SIZE)
     ax.grid()
 
     handles, labels = ax.get_legend_handles_labels()
