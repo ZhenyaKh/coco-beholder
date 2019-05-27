@@ -10,9 +10,10 @@ RECEIVER = 'receiver'
 PCAP     = '.pcap'
 JSON     = '.json'
 PNG      = '.png'
+LOG      = '.log'
 
 parser = argparse.ArgumentParser(description=
-'The script cleans two directories with data. The script deletes only pcap/json/png files and '
+'The script cleans two directories with data. The script deletes only pcap/json/png/log files and '
 'does not touch any subdirectories. If any of chosen data directories gets completely empty '
 'the script also deletes the directory.')
 
@@ -70,7 +71,8 @@ for directory in directories:
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
     for file in files:
-        if not file.endswith(PCAP) and not file.endswith(JSON) and not file.endswith(PNG):
+        if not file.endswith(PCAP) and not file.endswith(JSON) and not file.endswith(PNG)\
+                                                               and not file.endswith(LOG):
             continue
 
         if SENDER in file:
