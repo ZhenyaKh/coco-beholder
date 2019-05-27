@@ -543,6 +543,9 @@ def parse_arguments():
 
     args = parser.parse_args()
 
+    if args.interval <= 0.0:
+        sys.exit('Interval should be positive')
+
     args.dir = os.path.realpath(os.path.expanduser(args.dir))
 
     if not os.path.exists(args.dir):
