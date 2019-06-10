@@ -9,6 +9,20 @@ import subprocess
 import json
 import time
 
+DIR                  = 'dir'
+PANTHEON             = 'pantheon'
+LEFT_QUEUE           = 'left-queue'
+RIGHT_QUEUE          = 'right-queue'
+DEFAULT_LAYOUT_PATH  = 'layout.yml'
+LAYOUT_PATH          = 'layout-path'
+LAYOUT               = 'layout'
+BASE                 = 'base'
+DELTA                = 'delta'
+STEP                 = 'step'
+JITTER               = 'jitter'
+RATE                 = 'rate'
+MAX_DELAY            = 'max-delay'
+SEED                 = 'seed'
 PANTHEON_CONFIG_PATH = 'src/config.yml'
 SCHEMES              = 'schemes'
 FLOWS                = 'flows'
@@ -23,12 +37,47 @@ LEFT_RATE            = 'left-rate'
 RIGHT_RATE           = 'right-rate'
 LEFT_DELAY           = 'left-delay'
 RIGHT_DELAY          = 'right-delay'
-DEFAULT_LAYOUT_PATH  = 'layout.yml'
 SENDER               = 'sender'
 RECEIVER             = 'receiver'
 WRAPPERS_PATH        = 'src/wrappers'
 RUNS_FIRST           = 'runs-first'
 DEFAULT_QUEUE_SIZE   = 1000
+
+
+#
+# Function saves default layout yaml-file
+# param [in] layoutPath - path of the layout yaml-file
+# param [in] runtime    - runtime of testing in seconds
+# param [in] rate       - rate in Mbps of the central link of the dumbbell topology
+#
+def save_default_layout(layoutPath, runtime, rate):
+    layout = [{ SCHEME      : 'cubic',
+                FLOWS       : 1,
+                START       : 0,
+                DIRECTION   : LEFTWARD,
+                LEFT_RATE   : None,
+                RIGHT_RATE  : None,
+                LEFT_DELAY  : '0ms',
+                RIGHT_DELAY : '0ms' },
+
+              { SCHEME      : 'vegas',
+                FLOWS       : 1,
+                START       : runtime / 2,
+                DIRECTION   : RIGHTWARD,
+                LEFT_RATE   : rate,
+                RIGHT_RATE  : rate,
+                LEFT_DELAY  : '0ms',
+                RIGHT_DELAY : '5000us' },
+
+              { SCHEME      : 'cubic',
+                FLOWS       : 1,
+                START       : 0,
+                DIRECTION   : RIGHTWARD,
+                LEFT_DELAY  : '0ms',
+                RIGHT_DELAY : '0ms' }]
+
+    with open(layoutPath, 'w') as yamlFile:
+        yaml.dump(layout, yamlFile, default_flow_style=False)
 
 
 #
@@ -70,27 +119,6 @@ def parse_flows_rate(item, index, itemKey):
         rate = float(rate)
 
     return rate
-
-
-#
-# Function determines who runs first: the sender or the receiver of the scheme.
-# In case of error throws an exception.
-# param [in] scheme      - scheme name
-# param [in] pantheonDir - path of Pantheon directory
-# returns who runs first: sender or receiver
-#
-def who_runs_first(scheme, pantheonDir):
-    schemePath = os.path.join(pantheonDir, WRAPPERS_PATH, scheme + '.py')
-
-    if not os.path.exists(schemePath):
-        raise Exception('Path of scheme "%s" does not exist:\n%s' % (scheme, schemePath))
-
-    runsFirst  = subprocess.check_output([schemePath, 'run_first']).strip()
-
-    if runsFirst != RECEIVER and runsFirst != SENDER:
-        raise Exception('Scheme "%s" does not tell if "receiver" or "sender" runs first' % scheme)
-
-    return runsFirst
 
 
 #
@@ -146,6 +174,27 @@ def parse_item_flows_number(item, index):
 
 
 #
+# Function determines who runs first: the sender or the receiver of the scheme.
+# In case of error throws an exception.
+# param [in] scheme      - scheme name
+# param [in] pantheonDir - path of Pantheon directory
+# returns who runs first: sender or receiver
+#
+def who_runs_first(scheme, pantheonDir):
+    schemePath = os.path.join(pantheonDir, WRAPPERS_PATH, scheme + '.py')
+
+    if not os.path.exists(schemePath):
+        raise Exception('Path of scheme "%s" does not exist:\n%s' % (scheme, schemePath))
+
+    runsFirst  = subprocess.check_output([schemePath, 'run_first']).strip()
+
+    if runsFirst != RECEIVER and runsFirst != SENDER:
+        raise Exception('Scheme "%s" does not tell if "receiver" or "sender" runs first' % scheme)
+
+    return runsFirst
+
+
+#
 # Function parses scheme of layout item.
 # In case of error throws an exception.
 # param [in] item       - layout item
@@ -161,6 +210,22 @@ def parse_item_scheme(item, index, allSchemes):
                         (scheme, index))
 
     return scheme
+
+
+#
+# Function processes Pantheon config file with schemes listed.
+# In case of error throws an exception.
+# param [in] pantheonDir - Pantheon directory path
+# returns list of schemes
+#
+def parse_pantheon_config(pantheonDir):
+    pantheonPath = os.path.join(pantheonDir, PANTHEON_CONFIG_PATH)
+
+    if not os.path.exists(pantheonPath):
+        raise Exception('Pantheon configuration file does not exist by path:\n%s' % pantheonPath)
+
+    with open(pantheonPath) as pantheonConfig:
+        return yaml.load(pantheonConfig)[SCHEMES].keys()
 
 
 #
@@ -196,93 +261,47 @@ def parse_time_str(timeString, maxDelay):
 
 
 #
-# Function saves default layout yaml-file
-# param [in] layoutPath - path of the layout yaml-file
-# param [in] runtime    - runtime of testing in seconds
-# param [in] rate       - rate in Mbps of the central link of the dumbbell topology
+# Function returns path of layout yaml-file. If the file does not exist it creates a default one.
+# In case of processing errors the function throws exception.
+# param [in] layoutArg - parsed argument with the path of the layout yaml-file
+# param [in] runtime   - runtime of testing in seconds
+# param [in] rate      - rate in Mbps of the central link of the dumbbell topology
+# returns the path of the layout yaml-file
 #
-def save_default_layout(layoutPath, runtime, rate):
-    layout = [{ SCHEME      : 'cubic',
-                FLOWS       : 1,
-                START       : 0,
-                DIRECTION   : LEFTWARD,
-                LEFT_RATE   : None,
-                RIGHT_RATE  : None,
-                LEFT_DELAY  : '0ms',
-                RIGHT_DELAY : '0ms' },
+def process_layout_argument(layoutArg, runtime, rate):
+    if layoutArg is not None:
+        layoutPath = os.path.realpath(os.path.expanduser(args.layout))
 
-              { SCHEME      : 'vegas',
-                FLOWS       : 1,
-                START       : runtime / 2,
-                DIRECTION   : RIGHTWARD,
-                LEFT_RATE   : rate,
-                RIGHT_RATE  : rate,
-                LEFT_DELAY  : '0ms',
-                RIGHT_DELAY : '5000us' },
+        if not os.path.exists(layoutPath):
+            raise Exception('Layout yaml-file %s does not exist' % layoutPath)
+    else:
+        layoutPath = os.path.realpath(os.path.expanduser(DEFAULT_LAYOUT_PATH))
 
-              { SCHEME      : 'cubic',
-                FLOWS       : 1,
-                START       : 0,
-                DIRECTION   : RIGHTWARD,
-                LEFT_DELAY  : '0ms',
-                RIGHT_DELAY : '0ms' }]
+        if not os.path.exists(layoutPath):
+            save_default_layout(layoutPath, runtime, rate)
 
-    with open(layoutPath, 'w') as yamlFile:
-        yaml.dump(layout, yamlFile, default_flow_style=False)
+    return layoutPath
 
 
 #
-# Function validates and adjusts positional arguments parsed by argparse argument parser
-# param [in, out] args - arguments parsed by argparse argument parser
+# Function returns the size of the transmit queue of a router depending on arguments passed by user.
+# In case of processing errors the function throws exception.
+# param [in] oneQueueArg   - parsed argument with the size of the queue of the router
+# param [in] bothQueuesArg - parsed argument with the common size of the queues of both the routers
+# returns the size of the transmit queue of the router
 #
-def process_positional_arguments(args):
-    args.base   = parse_time_str(args.base,   args.max_delay)
-    args.delta  = parse_time_str(args.delta,  args.max_delay)
-    args.step   = parse_time_str(args.step,   args.max_delay)
-    args.jitter = parse_time_str(args.jitter, args.max_delay) if args.jitter else 0
-
-    if args.delta < 10000:
-        raise Exception('Delta time less than 10ms makes no sense, as tc qdisc change takes ~4ms.')
-
-
-#
-# Function validates and adjusts optional arguments parsed by argparse argument parser
-# param [in, out] args - arguments parsed by argparse argument parser
-#
-def process_optional_arguments(args):
-    args.dir = os.path.realpath(os.path.expanduser(args.dir))
-
-    if not os.path.exists(args.dir):
-        os.makedirs(args.dir)
-
-    args.pantheon = os.path.realpath(os.path.expanduser(args.pantheon))
-
-    if not os.path.exists(args.pantheon):
-        raise Exception('Pantheon directory %s does not exist' % args.pantheon)
-
-    if args.runtime > 60 or args.runtime <= 0:
-        raise Exception('Runtime cannot be non-positive or greater than 60 seconds')
-
-    if args.queues is not None and (args.left_queue is not None or args.right_queue is not None):
+def process_queue_argument(oneQueueArg,  bothQueuesArg):
+    if bothQueuesArg is not None and oneQueueArg is not None:
         raise Exception('--queues cannot be used together with --left-queue or --right-queue')
 
-    if args.left_queue  is None: args.left_queue  = DEFAULT_QUEUE_SIZE
-    if args.right_queue is None: args.right_queue = DEFAULT_QUEUE_SIZE
-
-    if args.queues is not None:
-        args.left_queue  = args.queues
-        args.right_queue = args.queues
-
-    if args.layout:
-        args.layout = os.path.realpath(os.path.expanduser(args.layout))
-
-        if not os.path.exists(args.layout):
-            raise Exception('Layout yaml-file %s does not exist' % args.layout)
+    if oneQueueArg is not None:
+        queueSize = oneQueueArg
+    elif bothQueuesArg is not None:
+        queueSize = bothQueuesArg
     else:
-        args.layout = os.path.realpath(os.path.expanduser(DEFAULT_LAYOUT_PATH))
+        queueSize = DEFAULT_QUEUE_SIZE
 
-        if not os.path.exists(args.layout):
-            save_default_layout(args.layout, args.runtime, args.rate)
+    return queueSize
 
 
 #
@@ -339,15 +358,15 @@ def add_optional_arguments(parser):
 
     parser.add_argument('-q1', '--left-queue', type=int, metavar='SIZE',
                         help='Size of transmit queue of the left router of the dumbbell topology'\
-                             ', default is 1000 packets')
+                             ', default is %d packets' % DEFAULT_QUEUE_SIZE)
 
     parser.add_argument('-q2', '--right-queue', type=int, metavar='SIZE',
                         help='Size of transmit queue of the right router of the dumbbell topology'\
-                             ', default is 1000 packets')
+                             ', default is %d packets' % DEFAULT_QUEUE_SIZE)
 
     parser.add_argument('-q', '--queues', type=int, metavar='SIZE',
                         help='Size of transmit queues of both the routers of the dumbbell topology'\
-                             ', same as -q1 N -q2 N, default is 1000 packets')
+                             ', same as -q1 N -q2 N, default is %d packets' % DEFAULT_QUEUE_SIZE)
 
 
 #
@@ -366,34 +385,44 @@ class BlankLinesHelpFormatter (argparse.HelpFormatter):
 
 
 #
-# Function saves metadata of the testing
-# param [in] args - arguments with which the testing should be launched
+# Function generates metadata using processed arguments and parsed layout and saves it to json-file
+# param [in] processedArgs - processed arguments
+# param [in] parsedLayout  - parsed layout
 #
-def save_metadata(args):
-    meta = {}
+def save_metadata(processedArgs, parsedLayout):
+    metadata =\
+    {
+        RATE        : processedArgs[RATE       ],
+        RUNTIME     : processedArgs[RUNTIME    ],
+        MAX_DELAY   : processedArgs[MAX_DELAY  ],
+        SEED        : processedArgs[SEED       ],
+        LEFT_QUEUE  : processedArgs[LEFT_QUEUE ],
+        RIGHT_QUEUE : processedArgs[RIGHT_QUEUE],
+        BASE        : processedArgs[BASE       ],
+        DELTA       : processedArgs[DELTA      ],
+        STEP        : processedArgs[STEP       ],
+        JITTER      : processedArgs[JITTER     ],
+        LAYOUT      : parsedLayout
+    }
 
-    meta[SCHEMES ] = args.schemes
-    meta[FLOWS   ] = args.flows
-    meta[RUNTIME ] = args.runtime
-    meta[INTERVAL] = args.interval
-
-    metadataPath = os.path.join(args.dir, METADATA_NAME)
+    metadataPath = os.path.join(processedArgs[DIR], METADATA_NAME)
 
     with open(metadataPath, 'w') as metadataFile:
-        json.dump(meta, metadataFile, sort_keys=True, indent=4, separators=(',', ': '))
+        json.dump(metadata, metadataFile, sort_keys=True, indent=4, separators=(',', ': '))
 
 
 #
-# Function parses layout yaml-file. In case of parsing errors the function throws exception.
+# Function parses layout yaml-file.
+# In case of parsing errors the function throws exception.
 # param [in] layoutPath  - path of the layout yaml-file
-# param [in] allSchemes  - list of names of all the schemes present in Pantheon collection
 # param [in] runtime     - runtime of testing in seconds
 # param [in] pantheonDir - path of Pantheon directory
 # param [in] maxDelay    - maximum possible delay
-# returns processed layout
+# returns parsed layout
 #
-def parse_layout(layoutPath, allSchemes, runtime, pantheonDir, maxDelay):
+def parse_layout(layoutPath, runtime, pantheonDir, maxDelay):
     layout     = []
+    allSchemes = parse_pantheon_config(pantheonDir)
     itemsArray = yaml.load(open(layoutPath, 'r'))
 
     if not isinstance(itemsArray, list):
@@ -429,18 +458,50 @@ def parse_layout(layoutPath, allSchemes, runtime, pantheonDir, maxDelay):
 
 
 #
-# Function processes Pantheon config file with schemes listed
-# param [in] pantheonDir - Pantheon directory path
-# returns list of schemes
+# Function validates and adjusts arguments parsed by argparse parser.
+# In case of processing errors the function throws exception.
+# param [in] args - arguments parsed by argparse parser
+# returns processed arguments
 #
-def parse_pantheon_config(pantheonDir):
-    with open(os.path.join(pantheonDir, PANTHEON_CONFIG_PATH)) as config:
-        return yaml.load(config)[SCHEMES].keys()
+def process_arguments(args):
+    output = { }
+
+    output[RUNTIME] = args.runtime
+
+    if output[RUNTIME] > 60 or output[RUNTIME] <= 0:
+        raise Exception('Runtime cannot be non-positive or greater than 60 seconds')
+
+    output[DIR] = os.path.realpath(os.path.expanduser(args.dir))
+
+    if not os.path.exists(output[DIR]):
+        os.makedirs(output[DIR])
+
+    output[PANTHEON] = os.path.realpath(os.path.expanduser(args.pantheon))
+
+    if not os.path.exists(output[PANTHEON]):
+        raise Exception('Pantheon directory %s does not exist' % output[PANTHEON])
+
+    output[RATE       ] = args.rate
+    output[MAX_DELAY  ] = args.max_delay
+    output[SEED       ] = args.seed
+    output[LEFT_QUEUE ] = process_queue_argument (args.left_queue,  args.queues)
+    output[RIGHT_QUEUE] = process_queue_argument (args.right_queue, args.queues)
+    output[LAYOUT_PATH] = process_layout_argument(args.layout,      output[RUNTIME], output[RATE])
+
+    output[BASE       ] = parse_time_str(args.base,   output[MAX_DELAY])
+    output[DELTA      ] = parse_time_str(args.delta,  output[MAX_DELAY])
+    output[STEP       ] = parse_time_str(args.step,   output[MAX_DELAY])
+    output[JITTER     ] = parse_time_str(args.jitter, output[MAX_DELAY]) if args.jitter else 0
+
+    if output[DELTA] < 10000:
+        raise Exception('Delta time less than 10ms makes no sense, as tc qdisc change takes ~4ms.')
+
+    return output
 
 
 #
-# Function processes input arguments of the script
-# returns list of input arguments of the script
+# Function parses input arguments of the program with argparse parser
+# returns arguments of the program parsed by argparse parser
 #
 def parse_arguments():
     parser = argparse.ArgumentParser(formatter_class=BlankLinesHelpFormatter, description=
@@ -453,10 +514,6 @@ def parse_arguments():
 
     args = parser.parse_args()
 
-    process_optional_arguments(args)
-
-    process_positional_arguments(args)
-
     return args
 
 
@@ -468,35 +525,28 @@ if __name__ == '__main__':
         sys.exit("Please, do not run as root. We need to learn your user name.")
 
     user = getpass.getuser()
-
-    #try:
     args = parse_arguments()
-    #except Exception as error:
-    #    print("Arguments parsing failed:\n%s" % error)
-    #    sys.exit(1)
-
-    allSchemes = parse_pantheon_config(args.pantheon)
 
     try:
-        layout = parse_layout(args.layout, allSchemes, args.runtime, args.pantheon, args.max_delay)
+        args = process_arguments(args)
+    except Exception as error:
+        print("Arguments processing failed:\n%s" % error)
+        sys.exit(1)
+
+    try:
+        layout = parse_layout(args[LAYOUT_PATH], args[RUNTIME], args[PANTHEON], args[MAX_DELAY])
     except Exception as error:
         print("Layout parsing failed:\n%s" % error)
         sys.exit(1)
 
-    print("LAYOUT\n")
-    print(layout)
+    save_metadata(args, layout)
 
-    sys.exit(1)
-    #save_metadata(args)
-    args.schemes = ['vegas']
-    for scheme in args.schemes:
-        subprocess.call('sudo mn -c --verbosity=output', shell=True)
+    subprocess.call(['sudo', 'mn', '-c', '--verbosity=output'])
 
-        print("Testing %s..." % scheme)
-        subprocess.call('sudo python test.py %s %s %s %s %s %s %s %s %s %s %s 1 0' %
-           (user, scheme, args.dir,   args.pantheon, args.rate, args.runtime, args.max_delay,
-                          args.base,  args.delta,    args.step, args.jitter,
-                          ), shell=True)
+    print("Testing...")
 
-    subprocess.call('sudo mn -c --verbosity=output', shell=True)
+    subprocess.call(['sudo', 'python', 'test1.py', user, args[DIR], args[PANTHEON]])
+
+    subprocess.call(['sudo', 'mn', '-c', '--verbosity=output'])
+
     print("Done.")
