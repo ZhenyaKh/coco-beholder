@@ -2,3 +2,4 @@
 data/*
 dumps/*
 graphs/*
+*.yml
