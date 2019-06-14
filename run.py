@@ -26,6 +26,7 @@ SEED                 = 'seed'
 PANTHEON_CONFIG_PATH = 'src/config.yml'
 SCHEMES              = 'schemes'
 FLOWS                = 'flows'
+ALL_FLOWS            = 'all-flows'
 RUNTIME              = 'runtime'
 METADATA_NAME        = 'metadata.json'
 SCHEME               = 'scheme'
@@ -61,7 +62,7 @@ def save_default_layout(layoutPath, runtime, rate):
                 RIGHT_DELAY : '0ms' },
 
               { SCHEME      : 'vegas',
-                FLOWS       : 1,
+                FLOWS       : 2,
                 START       : runtime / 2,
                 DIRECTION   : RIGHTWARD,
                 LEFT_RATE   : rate,
@@ -181,7 +182,7 @@ def parse_item_flows_number(item, index):
 # returns who runs first: sender or receiver
 #
 def who_runs_first(scheme, pantheonDir):
-    schemePath = os.path.join(pantheonDir, WRAPPERS_PATH, scheme + '.py')
+    schemePath = os.path.join(pantheonDir, WRAPPERS_PATH, "%s.py" % scheme)
 
     if not os.path.exists(schemePath):
         raise Exception('Path of scheme "%s" does not exist:\n%s' % (scheme, schemePath))
@@ -332,15 +333,15 @@ def add_positional_arguments(parser):
 # param [in, out] parser - argparse argument parser
 #
 def add_optional_arguments(parser):
-    parser.add_argument('-d', '--dir', default='dumps', metavar='PATH',
+    parser.add_argument('-d', '--dir', default='dumps', metavar='DIR',
                         help='output directory, default is "dumps"')
 
-    parser.add_argument('-p', '--pantheon', required=True, metavar='PATH',
+    parser.add_argument('-p', '--pantheon', required=True, metavar='DIR',
                         help='Pantheon directory where schemes will be searched')
 
-    parser.add_argument('-l', '--layout', metavar='FILENAME',
-                        help='yaml-file defining distribution of flows per schemes in the topology'\
-                             ', default is "%s"' % DEFAULT_LAYOUT_PATH)
+    parser.add_argument('-l', '--layout', metavar='FILE',
+    help='yaml-file defining distribution of flows per schemes in the topology, '
+         'default is "%s" which is created if does not exist' % DEFAULT_LAYOUT_PATH)
 
     parser.add_argument('-r', '--rate', default=100.0, type=float, metavar='MBITPS',
                         help='rate of the link in Mbit/s, type is float, default value is 100.0')
@@ -352,9 +353,8 @@ def add_optional_arguments(parser):
                         help='maximum per-link delay in us (default is 100000000, that is 100 sec)')
 
     parser.add_argument('-s', '--seed', default=time.time(), type=float,
-                        help='randomization seed to define if delay is increased or decreased '\
-                             'by step after a subsequent delta time, if  not specified is set '\
-                             'to current Unix time')
+    help='randomization seed to define if delay is increased or decreased by step after '
+         'a subsequent delta time, if  not specified is set to current Unix time')
 
     parser.add_argument('-q1', '--left-queue', type=int, metavar='SIZE',
                         help='Size of transmit queue of the left router of the dumbbell topology'\
@@ -402,7 +402,8 @@ def save_metadata(processedArgs, parsedLayout):
         DELTA       : processedArgs[DELTA      ],
         STEP        : processedArgs[STEP       ],
         JITTER      : processedArgs[JITTER     ],
-        LAYOUT      : parsedLayout
+        LAYOUT      : parsedLayout,
+        ALL_FLOWS   : sum(entry[FLOWS] for entry in parsedLayout)
     }
 
     metadataPath = os.path.join(processedArgs[DIR], METADATA_NAME)
@@ -425,8 +426,8 @@ def parse_layout(layoutPath, runtime, pantheonDir, maxDelay):
     allSchemes = parse_pantheon_config(pantheonDir)
     itemsArray = yaml.load(open(layoutPath, 'r'))
 
-    if not isinstance(itemsArray, list):
-        raise Exception('Data in yaml-file is not array but it should be array of dictionaries')
+    if not isinstance(itemsArray, list) or len(itemsArray) == 0:
+        raise Exception('Data in yaml-file should be non-empty array of dictionaries')
 
     for index, item in enumerate(itemsArray, start=1):
         if not isinstance(item, dict):
