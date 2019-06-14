@@ -144,9 +144,9 @@ class Test(object):
 
 
     #
-    # Method generates layout for each flow depending on number of flows in each entry of layout
+    # Method generates layout for each flow depending on number of flows in each entry of "layout"
     # field of metadata.
-    # param [in] layout - metadata layout\
+    # param [in] layout - metadata layout
     # throws MetadataError
     # returns per flow layout
     #
