@@ -158,8 +158,8 @@ class Test(object):
 
         # sanity check
         if len(perFlowLayout) != self.flows:
-            raise MetadataError('Insanity: field "%s" is not equal to sum of "%s" in field "%s"' %
-                               (ALL_FLOWS, FLOWS, LAYOUT))
+            raise MetadataError('Insanity: field "%s"=%d must be %d (sum of all "%s" in "%s")!!!' %
+                               (ALL_FLOWS, self.flows, len(perFlowLayout), FLOWS, LAYOUT))
 
         subnetsNumber  = 2**(SUPERNET_SIZE - SUBNET_SIZE)
         maxFlowsNumber = (subnetsNumber - 1) / 2
