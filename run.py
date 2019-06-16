@@ -58,41 +58,90 @@ def save_default_layout(layoutPath, runtime, rate):
                 DIRECTION   : LEFTWARD,
                 LEFT_RATE   : None,
                 RIGHT_RATE  : None,
-                LEFT_DELAY  : '0ms',
-                RIGHT_DELAY : '0ms' },
+                LEFT_DELAY  : None,
+                RIGHT_DELAY : None },
 
               { SCHEME      : 'vegas',
                 FLOWS       : 2,
                 START       : runtime / 2,
                 DIRECTION   : RIGHTWARD,
                 LEFT_RATE   : rate,
-                RIGHT_RATE  : rate,
-                LEFT_DELAY  : '0ms',
-                RIGHT_DELAY : '5000us' },
+                RIGHT_RATE  : int(rate),
+                LEFT_DELAY  : '0us',
+                RIGHT_DELAY : '5ms' },
 
               { SCHEME      : 'cubic',
                 FLOWS       : 1,
                 START       : 0,
-                DIRECTION   : RIGHTWARD,
-                LEFT_DELAY  : '0ms',
-                RIGHT_DELAY : '0ms' }]
+                DIRECTION   : RIGHTWARD
+              }]
 
     with open(layoutPath, 'w') as yamlFile:
+        yamlFile.write("# Delays/rates are optional: if lacking or null, they are set to 0us/0.0\n"
+                       "# and for netem, to set delay/rate to zero is same as to leave it unset.\n")
+
         yaml.dump(layout, yamlFile, default_flow_style=False)
+
+
+#
+# Function adds arguments specifying sizes of transmit queues of the two routers in the dumbbell
+# topology to argparse argument parser.
+# param [in, out] parser - argparse argument parser
+#
+def add_queue_arguemnts(parser):
+    parser.add_argument('-q1', '--left-queue', type=int, metavar='SIZE',
+    help='Size of transmit queue of the left router\'s interface at the end of the central link of '
+         'the dumbbell topology, default is %d packets' % DEFAULT_QUEUE_SIZE)
+
+    parser.add_argument('-q2', '--right-queue', type=int, metavar='SIZE',
+    help='Size of transmit queue of the right router\'s interface at the end of the central link '
+         'of the dumbbell topology, default is %d packets' % DEFAULT_QUEUE_SIZE)
+
+    parser.add_argument('-q', '--queues', type=int, metavar='SIZE',
+    help='Common size of transmit queues of both the interfaces at the ends of the central link of '
+         'the dumbbell topology, same as -q1 N -q2 N, default is %d packets' % DEFAULT_QUEUE_SIZE)
+
+#
+# Function adds arguments specifying parameters of variable delay at the central link of the
+# dumbbell topology to argparse argument parser.
+# param [in, out] parser - argparse argument parser
+#
+def add_delay_arguments(parser):
+    parser.add_argument('base', action="store",
+    help='Initial delay set at both ends of the central link in the formats: N (milliseconds '
+         'assumed), Nus, Nms, Ns')
+
+    parser.add_argument('delta', action="store",
+    help='The delay at both ends of the central link is changed each delta time, the formats for '
+         'delta: N (milliseconds assumed), Nus, Nms, Ns. If you do not need variable delay and '
+         'want the delay to be constant just set delta to a value greater than that of '
+         '-t/--runtime.')
+
+    parser.add_argument('step', action="store",
+    help='Step by which the  delay at both ends of the central link is changed each delta time in '
+         'these formats: N (milliseconds assumed), Nus, Nms, Ns. The delay will always lie in '
+         'range [0us, --max-delay us].')
+
+    parser.add_argument('jitter', action="store", nargs='?',
+    help='Jitter affecting the delay at both ends of the central link in the formats: N '
+         '(milliseconds assumed), Nus, Nms, Ns. The argument is optional.')
 
 
 #
 # Function parses delay of the left/right half of the dumbbell topology for the flows of the item.
 # In case of error throws an exception.
-# param [in] item    - layout item
-# param [in] index   - index of the layout item
-# param [in] itemKey - key name of the item: "left-delay" or "right-delay"
-# returns delay of the left/right half of the dumbbell topology for the flows of the item
+# param [in] item     - layout item
+# param [in] index    - index of the layout item
+# param [in] maxDelay - maximum possible delay in microseconds
+# param [in] itemKey  - key name of the item: "left-delay" or "right-delay"
+# returns delay in microseconds of the half of the dumbbell topology for the flows of the item
 #
 def parse_flows_delay(item, index, maxDelay, itemKey):
     delay = item.get(itemKey)
 
-    if delay is not None:
+    if delay is None:
+        delay = 0
+    else:
         try:
             delay = parse_time_str(str(delay), maxDelay)
         except Exception as error:
@@ -108,12 +157,14 @@ def parse_flows_delay(item, index, maxDelay, itemKey):
 # param [in] item    - layout item
 # param [in] index   - index of the layout item
 # param [in] itemKey - key name of the item: "left-rate" or "right-rate"
-# returns rate of the left/right half of the dumbbell topology for the flows of the item
+# returns rate in Mbps of the left/right half of the dumbbell topology for the flows of the item
 #
 def parse_flows_rate(item, index, itemKey):
     rate = item.get(itemKey)
 
-    if rate is not None:
+    if rate is None:
+        rate = float(0)
+    else:
         if not isinstance(rate, (int, float)):
             raise Exception('%s in item #%d is "%s" but if present it should be ' \
                             'float or integer (unit is Mbps)' % (itemKey, index, rate))
@@ -145,7 +196,7 @@ def parse_flows_direction(item, index):
 # param [in] item    - layout item
 # param [in] index   - index of the layout item
 # param [in] runtime - runtime of testing in seconds
-# returns processed start of flows of the layout item
+# returns second on which flows of the layout item should be started
 #
 def parse_item_flows_start(item, index, runtime):
     start = item.get(START)
@@ -233,7 +284,7 @@ def parse_pantheon_config(pantheonDir):
 # Function parses time string in the formats: N (milliseconds assumed), Nus, Nms, Ns.
 # In case of parsing errors the function throws exception.
 # param [in] timeString - time string
-# param [in] maxDelay   - maximum possible delay
+# param [in] maxDelay   - maximum possible delay in microseconds
 # returns time in microseconds
 #
 def parse_time_str(timeString, maxDelay):
@@ -306,67 +357,44 @@ def process_queue_argument(oneQueueArg,  bothQueuesArg):
 
 
 #
-# Function adds positional arguments to argparse argument parser
+# Function adds arguments to argparse argument parser
 # param [in, out] parser - argparse argument parser
 #
-def add_positional_arguments(parser):
-    parser.add_argument('base', action="store",
-                         help='Initial delay set both for sender and receiver in the formats: '\
-                              'N (milliseconds assumed), Nus, Nms, Ns')
+def add_arguments(parser):
+    add_delay_arguments(parser)
 
-    parser.add_argument('delta', action="store",
-                         help='Delay is changed each delta time, '\
-                              'the formats for delta: N (milliseconds assumed), Nus, Nms, Ns')
-
-    parser.add_argument('step', action="store",
-                         help='Step by which delay is changed each delta time in these formats: '\
-                              'N (milliseconds assumed), Nus, Nms, Ns. '\
-                              'Delay will always lie in range [0us, --max-delay us].')
-
-    parser.add_argument('jitter', action="store", nargs='?',
-                        help='Jitter affecting the delay in the formats: ' \
-                             'N (milliseconds assumed), Nus, Nms, Ns. ')
-
-
-#
-# Function adds optional arguments to argparse argument parser
-# param [in, out] parser - argparse argument parser
-#
-def add_optional_arguments(parser):
     parser.add_argument('-d', '--dir', default='dumps', metavar='DIR',
-                        help='output directory, default is "dumps"')
+    help='Output directory, default is "dumps". Service file metadata.json containing parameters '
+         'with which testing is actually performed is written there. For each flow, pcap-files, '
+         'recorded at interfaces of the two hosts between which the flow runs, are written there '
+         'named in the format <flow #>-<scheme>-<sender/receiver>.pcap')
 
     parser.add_argument('-p', '--pantheon', required=True, metavar='DIR',
-                        help='Pantheon directory where schemes will be searched')
+    help='Pantheon [pantheon.stanford.edu] directory where congestion control schemes are searched')
 
     parser.add_argument('-l', '--layout', metavar='FILE',
-    help='yaml-file defining distribution of flows per schemes in the topology, '
-         'default is "%s" which is created if does not exist' % DEFAULT_LAYOUT_PATH)
+    help='Input yaml-file defining groups of flows run in the dumbbell topology. Default is "%s" '
+         'and during the first run of the script this file is created with example settings.'
+         % DEFAULT_LAYOUT_PATH)
 
     parser.add_argument('-r', '--rate', default=100.0, type=float, metavar='MBITPS',
-                        help='rate of the link in Mbit/s, type is float, default value is 100.0')
+    help='Rate of the central link in Mbit/s, type is float, default value is 100.0. If you do not '
+         'want to limit the rate just set it to zero: for qdisc netem, setting rate/delay of an '
+         'interface to zero means the same as you leave the parameter unset.')
 
     parser.add_argument('-t', '--runtime', default=30, type=int, metavar='SEC',
-                        help='runtime of testing in seconds (default 30)')
+    help='Runtime of testing in seconds (default 30)')
 
     parser.add_argument('-m', '--max-delay', default=int(1e8), type=int, metavar='USEC',
-                        help='maximum per-link delay in us (default is 100000000, that is 100 sec)')
+    help='Maximum delay for any interface in microseconds (default is 100000000, that is 100 sec)')
 
     parser.add_argument('-s', '--seed', default=time.time(), type=float,
-    help='randomization seed to define if delay is increased or decreased by step after '
-         'a subsequent delta time, if  not specified is set to current Unix time')
+    help='Randomization seed to define if the delay at the central link is increased or decreased '
+         'by step after  a subsequent delta time, if not specified is set to current Unix time. '
+         'The parameter is useful if one wants to reproduce results of testing in which delay '
+         'variability feature was used.')
 
-    parser.add_argument('-q1', '--left-queue', type=int, metavar='SIZE',
-                        help='Size of transmit queue of the left router of the dumbbell topology'\
-                             ', default is %d packets' % DEFAULT_QUEUE_SIZE)
-
-    parser.add_argument('-q2', '--right-queue', type=int, metavar='SIZE',
-                        help='Size of transmit queue of the right router of the dumbbell topology'\
-                             ', default is %d packets' % DEFAULT_QUEUE_SIZE)
-
-    parser.add_argument('-q', '--queues', type=int, metavar='SIZE',
-                        help='Size of transmit queues of both the routers of the dumbbell topology'\
-                             ', same as -q1 N -q2 N, default is %d packets' % DEFAULT_QUEUE_SIZE)
+    add_queue_arguemnts(parser)
 
 
 #
@@ -418,7 +446,7 @@ def save_metadata(processedArgs, parsedLayout):
 # param [in] layoutPath  - path of the layout yaml-file
 # param [in] runtime     - runtime of testing in seconds
 # param [in] pantheonDir - path of Pantheon directory
-# param [in] maxDelay    - maximum possible delay
+# param [in] maxDelay    - maximum possible delay in microseconds
 # returns parsed layout
 #
 def parse_layout(layoutPath, runtime, pantheonDir, maxDelay):
@@ -506,12 +534,24 @@ def process_arguments(args):
 #
 def parse_arguments():
     parser = argparse.ArgumentParser(formatter_class=BlankLinesHelpFormatter, description=
-    'The script runs testing for congestion control schemes and outputs pcap-files '
-    'captured at senders and receivers of the schemes to a specified directory.')
+    'The script tests congestion control schemes by running flows of different schemes in '
+    'the dumbbell topology for runtime seconds. Each flow has a host in the left half '
+    'and a host in the right half of the topology and the hosts exchange a scheme\'s '
+    'traffic with one host being the sender and one being the receiver. There is the '
+    'left router that interconnects all the hosts in the left half and the right router that '
+    'interconnects all the hosts in the right half of the topology. All the flows share the common '
+    'central link between the two routers. User can define how many flows of which schemes should '
+    'be run by defining groups of flows. A group of flows is defined by a scheme name, number of '
+    'flows, a second of runtime at which the group of flows should be started, direction of the '
+    'flows: left-to-right or right-to-left, rate and delay of the links belonging to the flows in '
+    'the left half of the topology, rate and delay or the links belonging to the flows in the '
+    'right half of the topology. For the central link, user can define its rate, constant or '
+    'VARIABLE DELAY with optional jitter, sizes of transmit queues of the routers at the ends of '
+    'the central link. Qdisc netem is applied to interfaces of links to set rates, delays and '
+    'queue sizes of the links. For each link, the specified rate/delay/queue parameters are always '
+    'installed at both ends of the link.')
 
-    add_optional_arguments(parser)
-
-    add_positional_arguments(parser)
+    add_arguments(parser)
 
     args = parser.parse_args()
 
@@ -544,7 +584,7 @@ if __name__ == '__main__':
 
     subprocess.call(['sudo', 'mn', '-c', '--verbosity=output'])
 
-    print("Testing...")
+    print("Testing:")
 
     subprocess.call(['sudo', 'python', 'test1.py', user, args[DIR], args[PANTHEON]])
 

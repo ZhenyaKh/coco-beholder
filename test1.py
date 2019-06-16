@@ -52,6 +52,7 @@ EXIT_SUCCESS        = 0
 EXIT_FAILURE        = 1
 SUCCESS_MESSAGE     = "SUCCESS"
 FAILURE_MESSAGE     = "FAILURE"
+DEFAULT_QUEUE_SIZE  = 1000
 
 
 #
@@ -117,11 +118,24 @@ class Test(object):
     #
     #
     #
+    def test(self):
+        print("Total number of flows is %d" % self.flows)
+
+        self.setup()
+
+
+    #
+    #
+    #
     def setup(self):
         random.seed(self.seed)
 
+        print("Creating the dumbbell topology...")
         self.build_dumbbell_network()
+        print("Setting schemes up after reboot...")
         self.setup_schemes_after_reboot()
+        print("Setting rates, (base) delays and queue sizes at the topology's interfaces...")
+        self.setup_interfaces_qdisc()
 
 
     #
@@ -167,9 +181,6 @@ class Test(object):
         if len(perFlowLayout) > maxFlowsNumber:
             raise MetadataError('Flows number is %d but, with supernet %s, max flows number is %d' %
                                (len(perFlowLayout), SUPERNET_ADDRESS, maxFlowsNumber))
-
-        print("Total number of flows is %d" % len(perFlowLayout))
-
         return perFlowLayout
 
 
@@ -269,6 +280,38 @@ class Test(object):
 
 
     #
+    # Method sets rates, (base) delays and queue sizes at the topology's interfaces
+    #
+    def setup_interfaces_qdisc(self):
+        # setting netem for the central link of the dumbbell topology
+
+        netemCmd = 'tc qdisc add dev %s root netem delay %dus %dus rate %sMbit limit %d'
+
+        self.leftRouter. cmd(netemCmd % (self.leftRouter.intfs[self.flows], self.delaysArrayUs[0],
+                                         self.jitterUs, self.rateMbps, self.leftQueuePkts))
+
+        self.rightRouter.cmd(netemCmd % (self.rightRouter.intfs[self.flows], self.delaysArrayUs[0],
+                                         self.jitterUs, self.rateMbps, self.rightQueuePkts))
+
+        # setting netem for all the links in the left and right halves of the dumbbell topology
+
+        netemCmd = 'tc qdisc add dev %s root netem delay %dus rate %sMbit limit %d'
+
+        for i in range(0, self.flows):
+            self.leftRouter.   cmd(netemCmd % (self.leftRouter.intfs[i],  self.leftDelaysUs[i],
+                                               self.leftRatesMbps[i],     DEFAULT_QUEUE_SIZE))
+
+            self.leftHosts[i]. cmd(netemCmd % (self.leftHosts[i].intf(),  self.leftDelaysUs[i],
+                                               self.leftRatesMbps[i],     DEFAULT_QUEUE_SIZE))
+
+            self.rightRouter.  cmd(netemCmd % (self.rightRouter.intfs[i], self.rightDelaysUs[i],
+                                               self.rightRatesMbps[i],    DEFAULT_QUEUE_SIZE))
+
+            self.rightHosts[i].cmd(netemCmd % (self.rightHosts[i].intf(), self.rightDelaysUs[i],
+                                               self.rightRatesMbps[i],    DEFAULT_QUEUE_SIZE))
+
+
+    #
     # Method generates arrays of delta times and corresponding delays for future
     # delay variability of the central link of the dumbbell topology
     # throws MetadataError
@@ -337,10 +380,6 @@ class Test(object):
             router.  cmd('ethtool -K %s tx off sg off tso off ufo off' % router.intfs[i])
             hosts[i].cmd('ethtool -K %s tx off sg off tso off ufo off' % hosts[i].intf())
 
-            # setting egress qdisc of each of the two interfaces to FIFO queue limited by 1000 packets
-            router.  cmd('tc qdisc add dev %s root pfifo limit 1000' % router.intfs[i])
-            hosts[i].cmd('tc qdisc add dev %s root pfifo limit 1000' % hosts[i].intf())
-
             # setting arp entries for the entire subnet
             router.  cmd('arp', '-s', hosts[i].intf().IP(), hosts[i].intf().MAC())
             hosts[i].cmd('arp', '-s', router.intfs[i].IP(), router.intfs[i].MAC())
@@ -362,8 +401,8 @@ if __name__ == '__main__':
 
     try:
         test = Test(user, dir, pantheon)
-        test.setup()
-        #CLI(test.network)
+        test.test()
+        CLI(test.network)
     except MetadataError as error:
         print("Metadata error:\n%s" % error)
         exitCode = EXIT_FAILURE
