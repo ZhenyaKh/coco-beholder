@@ -6,6 +6,10 @@ import json
 import random
 import ipaddress
 import subprocess
+from subprocess import PIPE
+from itertools import chain
+from time import sleep
+import time
 
 from mininet.net import Mininet
 from mininet.net import CLI
@@ -33,6 +37,7 @@ RIGHT_RATE          = 'right-rate'
 LEFT_DELAY          = 'left-delay'
 RIGHT_DELAY         = 'right-delay'
 DIRECTION           = 'direction'
+START               = 'start'
 RUNS_FIRST          = 'runs-first'
 WRAPPERS_PATH       = 'src/wrappers'
 SENDER              = 'sender'
@@ -53,6 +58,9 @@ EXIT_FAILURE        = 1
 SUCCESS_MESSAGE     = "SUCCESS"
 FAILURE_MESSAGE     = "FAILURE"
 DEFAULT_QUEUE_SIZE  = 1000
+LEFTWARD            = '<-'
+RIGHTWARD           = '->'
+PORT                = 50000
 
 
 #
@@ -91,7 +99,7 @@ class Test(object):
         self.rightQueuePkts = metadata[RIGHT_QUEUE] # size of transmit queue of right router
         self.flows          = metadata[ALL_FLOWS  ] # total number of flows
 
-        perFlowLayout = self.compute_per_flow_layout(metadata[LAYOUT])
+        perFlowLayout = self.compute_per_flow_layout(metadata[LAYOUT])  # sorted by start
         self.directions     = [ i[DIRECTION  ] for i in perFlowLayout ] # per flow directions
         self.leftDelaysUs   = [ i[LEFT_DELAY ] for i in perFlowLayout ] # per flow left delays
         self.rightDelaysUs  = [ i[RIGHT_DELAY] for i in perFlowLayout ] # per flow right delays
@@ -99,43 +107,53 @@ class Test(object):
         self.rightRatesMbps = [ i[RIGHT_RATE ] for i in perFlowLayout ] # per flow right rates
         self.runsFirst      = [ i[RUNS_FIRST ] for i in perFlowLayout ] # per flow who runs first
         self.schemes        = [ i[SCHEME     ] for i in perFlowLayout ] # per flow scheme names
-        self.schemePaths    = self.compute_schemes_paths()              # per flow scheme paths
-        self.runsSecond     = self.compute_runs_second()                # per flow who runs second
+        self.schemePaths    = self.compute_schemes_paths()              # schemes' paths
 
         # arrays of delta times and of corresponding delays -- to variate central link netem delay
-        self.deltasArraySec, self.delaysArrayUs = self.compute_steps()
+        self.deltasArraySec,   self.delaysArrayUs = self.compute_steps()
+        # array of time intervals to sleep and array of arrays of flow ids to start after each sleep
+        self.intervalsToSleep, self.flowsToStart  = self.compute_starts_schedule(perFlowLayout)
 
-        self.network     = None # Mininet network
-        self.leftHosts   = None # hosts at left half of the dumbbell topology
-        self.leftRouter  = None # router interconnecting left hosts
-        self.rightHosts  = None # hosts at right half of the dumbbell topology
-        self.rightRouter = None # router interconnecting right hosts
-        self.servers     = None # per flow server hosts
-        self.clients     = None # per flow client hosts
-        self.clientsCmds = None # per flow commands to launch clients
+        self.network            = None # Mininet network
+        self.leftHosts          = None # hosts at left half of the dumbbell topology
+        self.leftRouter         = None # router interconnecting left hosts
+        self.rightHosts         = None # hosts at right half of the dumbbell topology
+        self.rightRouter        = None # router interconnecting right hosts
+        self.senderDumpPopens   = []   # per flow tcpdump processes recording at the flow's sender
+        self.receiverDumpPopens = []   # per flow tcpdump processes recording at the flow's receiver
+        self.serverPopens       = []   # per flow server processes
+        self.clientsPopens      = []   # per flow client processes
+        self.clients            = []   # per flow client hosts
+        self.clientsCmds        = []   # per flow commands to launch clients
+        for i in perFlowLayout:
+            print("%s\n" % i)
+
 
 
     #
     #
     #
     def test(self):
-        print("Total number of flows is %d" % self.flows)
-
-        self.setup()
-
-
-    #
-    #
-    #
-    def setup(self):
         random.seed(self.seed)
 
+        print("Total number of flows is %d" % self.flows)
+        print("Flows will be laid out in the topology by order of their start")
         print("Creating the dumbbell topology...")
         self.build_dumbbell_network()
         print("Setting schemes up after reboot...")
         self.setup_schemes_after_reboot()
-        print("Setting rates, (base) delays and queue sizes at the topology's interfaces...")
+        print("Setting rates, delays and queue sizes at the topology's interfaces...")
         self.setup_interfaces_qdisc()
+        print("Starting tcpdump recordings at hosts...")
+        print("See help to learn naming format of pcap-files")
+        self.start_tcpdump_recordings()
+        print("Starting servers...")
+        self.start_servers()
+        print("Starting clients and varying delay...")
+        self.start_clients()
+
+
+
 
 
     #
@@ -159,10 +177,10 @@ class Test(object):
 
     #
     # Method generates layout for each flow depending on number of flows in each entry of "layout"
-    # field of metadata.
+    # field of metadata. Flows are sorted by their starting points.
     # param [in] layout - metadata layout
     # throws MetadataError
-    # returns per flow layout
+    # returns per flow layout sorted by the flow's starting point
     #
     def compute_per_flow_layout(self, layout):
         perFlowLayout = []
@@ -181,49 +199,32 @@ class Test(object):
         if len(perFlowLayout) > maxFlowsNumber:
             raise MetadataError('Flows number is %d but, with supernet %s, max flows number is %d' %
                                (len(perFlowLayout), SUPERNET_ADDRESS, maxFlowsNumber))
+
+        perFlowLayout = sorted(perFlowLayout, key=lambda flow: flow[START])
+
         return perFlowLayout
 
 
     #
-    # Method generates scheme path for each flow
+    # Method generates dictionary of schemes' paths
     # throws MetadataError
-    # returns per flow array of scheme paths
+    # returns dictionary of schemes' paths
     #
     def compute_schemes_paths(self):
-        schemePaths = []
-        foundPaths  = {}
+        schemePaths = {}
 
         for scheme in self.schemes:
 
-            if scheme in foundPaths:
-                schemePaths.append(foundPaths[scheme])
-            else:
+            if scheme not in schemePaths:
                 schemePath = os.path.join(self.pantheon, WRAPPERS_PATH, "%s.py" % scheme)
 
                 if not os.path.exists(schemePath):
                     raise MetadataError('Path of scheme "%s" does not exist:\n%s' %
                                        (scheme, schemePath))
 
-                schemePaths.append(schemePath)
-                foundPaths[scheme] = schemePath
+                schemePaths[scheme] = schemePath
 
         return schemePaths
-
-
-    #
-    # Method generates who runs second -- sender or receiver -- for each flow
-    # returns per flow array of who runs second
-    #
-    def compute_runs_second(self):
-        runsSecond = []
-
-        for i in self.runsFirst:
-            if i == SENDER:
-                runsSecond.append(RECEIVER)
-            else:
-                runsSecond.append(SENDER)
-
-        return runsSecond
 
 
     #
@@ -271,12 +272,12 @@ class Test(object):
     # Method makes setup after reboot for each scheme
     #
     def setup_schemes_after_reboot(self):
-        processedPaths = {}
+        for schemePath in self.schemePaths.values():
+            try:
+                subprocess.check_call([schemePath, 'setp_after_reboot'], stdout=PIPE, stderr=PIPE)
+            except subprocess.CalledProcessError:
+                print("!")
 
-        for schemePath in self.schemePaths:
-            if schemePath not in processedPaths:
-                subprocess.call([schemePath, 'setup_after_reboot'])
-                processedPaths[schemePath] = True
 
 
     #
@@ -309,6 +310,104 @@ class Test(object):
 
             self.rightHosts[i].cmd(netemCmd % (self.rightHosts[i].intf(), self.rightDelaysUs[i],
                                                self.rightRatesMbps[i],    DEFAULT_QUEUE_SIZE))
+
+
+    #
+    # Method starts tcpdump recordings at sender host and at receiver host of each flow
+    #
+    def start_tcpdump_recordings(self):
+        for i in range(0, self.flows):
+            if self.directions[i] == LEFTWARD:
+                receiverHost = self.leftHosts[i]
+                senderHost   = self.rightHosts[i]
+            else:
+                receiverHost = self.rightHosts[i]
+                senderHost   = self.leftHosts[i]
+
+            receiverIntf     = receiverHost.intf()
+            senderIntf       = senderHost.  intf()
+
+            receiverIp       = receiverIntf.IP()
+            senderIp         = senderIntf.  IP()
+
+            receiverDumpName = "%d-%s-%s.pcap" % (i + 1, self.schemes[i], RECEIVER)
+            senderDumpName   = "%d-%s-%s.pcap" % (i + 1, self.schemes[i], SENDER)
+
+            receiverDumpPath = os.path.join(self.dir, receiverDumpName)
+            senderDumpPath   = os.path.join(self.dir, senderDumpName)
+
+            cmd = 'tcpdump -tt -nn -i %s -Z %s -w %s host %s and host %s and (tcp or udp)'
+
+            receiverDumpPopen = receiverHost.popen(
+                cmd % (receiverIntf, self.user, receiverDumpPath, receiverIp, senderIp))
+
+            senderDumpPopen   = senderHost.popen(
+                cmd % (senderIntf,   self.user, senderDumpPath,   receiverIp, senderIp))
+
+            self.receiverDumpPopens.append(receiverDumpPopen)
+            self.senderDumpPopens.  append(senderDumpPopen)
+
+        sleep(0.5)  # in order not to miss the first packets
+
+
+    #
+    # Method starts server for each flow and prepares the corresponding client for future start
+    #
+    def start_servers(self):
+        for i in range(0, self.flows):
+            if self.directions[i] == LEFTWARD:
+                leftHostRole = RECEIVER
+            else:
+                leftHostRole = SENDER
+
+            if leftHostRole == self.runsFirst[i]:
+                server = self.leftHosts [i]
+                client = self.rightHosts[i]
+            else:
+                server = self.rightHosts[i]
+                client = self.leftHosts [i]
+
+            schemePath = self.schemePaths[self.schemes[i]]
+
+            serverPopen = server.popen(
+                ['sudo', '-u', self.user, schemePath, self.runsFirst[i], str(PORT)])
+
+            self.serverPopens.append(serverPopen)
+
+            # Check if the server's ready. Maybe, this is not the best way but in Pantheon they just
+            # sleep for three seconds after opening all the servers.
+            while not server.cmd("lsof -i :%d" % PORT).strip(): pass
+
+            runsSecond = RECEIVER if self.runsFirst[i] == SENDER else SENDER
+
+            clientCmd = ['sudo', '-u', self.user, schemePath, runsSecond, server.IP(), str(PORT)]
+
+            self.clients.    append(client)
+            self.clientsCmds.append(clientCmd)
+
+
+    #
+    # Method starts clients for each flow
+    #
+    def start_clients(self):
+        benchmarkStart = time.time()  # TODO: remove benchmark
+
+        intervalIndex  = 0
+        totalIntervals = len(self.intervalsToSleep)
+
+        while True:
+            for flowId in self.flowsToStart[intervalIndex]:
+
+                self.clientsPopens.append(self.clients[flowId].popen(self.clientsCmds[flowId]))
+
+            intervalIndex += 1
+
+            if intervalIndex == totalIntervals:
+                break
+            else:
+                sleep(self.intervalsToSleep[intervalIndex])
+
+        print("Starting clients completed after %f seconds" % (time.time() - benchmarkStart))
 
 
     #
@@ -345,6 +444,29 @@ class Test(object):
             delaysUsArray.append(delayUs)
 
         return deltasSecArray, delaysUsArray
+
+
+    #
+    # Method generates schedule to start flows: intervals of sleeping and for each interval a list
+    # of ids of flows to start after the sleep
+    # param [in] perFlowLayout - per flow layout sorted by flow's start
+    #
+    def compute_starts_schedule(self, perFlowLayout):
+        intervalsToSleep = [ 0 ]
+        flowsToStart     = [ [] ]
+        previousStart    = 0
+
+        for index, flow in enumerate(perFlowLayout):
+            flowStart = flow[START]
+
+            if previousStart == flowStart:
+                flowsToStart[-1].append(index)
+            else:
+                intervalsToSleep.append(flowStart - previousStart)
+                flowsToStart    .append([ index ])
+                previousStart = flowStart
+
+        return intervalsToSleep, flowsToStart
 
 
     #

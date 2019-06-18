@@ -46,6 +46,38 @@ DEFAULT_QUEUE_SIZE   = 1000
 
 
 #
+# Function parses time string in the formats: N (milliseconds assumed), Nus, Nms, Ns.
+# param [in] timeString - time string
+# param [in] maxDelayUs - maximum possible delay in microseconds
+# throws ValueError
+# returns time in microseconds
+#
+def parse_time_str(timeString, maxDelayUs):
+    timeString = timeString.strip()
+
+    try:
+        if timeString.endswith("us"):
+            time = int(float(timeString[:-2]))
+        elif timeString.endswith("ms"):
+            time = int(float(timeString[:-2]) * 1e3)
+        elif timeString.endswith("s"):
+            time = int(float(timeString[:-1]) * 1e6)
+        else:
+            time = int(float(timeString) * 1e3)
+    except ValueError:
+        raise ValueError('Invalid time "%s".' % timeString)
+
+    if time < 0:
+        raise ValueError('Invalid time "%s". Time should be non-negative.' % timeString)
+
+    if time > maxDelayUs:
+        raise ValueError('Invalid time "%s". Time should be less than %d us.' %
+                        (timeString, maxDelayUs))
+
+    return time
+
+
+#
 # Function saves default layout yaml-file
 # param [in] layoutPath - path of the layout yaml-file
 # param [in] runtime    - runtime of testing in seconds
@@ -129,11 +161,11 @@ def add_delay_arguments(parser):
 
 #
 # Function parses delay of the left/right half of the dumbbell topology for the flows of the item.
-# In case of error throws an exception.
 # param [in] item     - layout item
 # param [in] index    - index of the layout item
 # param [in] maxDelay - maximum possible delay in microseconds
 # param [in] itemKey  - key name of the item: "left-delay" or "right-delay"
+# throws LayoutError
 # returns delay in microseconds of the half of the dumbbell topology for the flows of the item
 #
 def parse_flows_delay(item, index, maxDelay, itemKey):
@@ -144,19 +176,18 @@ def parse_flows_delay(item, index, maxDelay, itemKey):
     else:
         try:
             delay = parse_time_str(str(delay), maxDelay)
-        except Exception as error:
-            raise Exception('%s in item #%d is "%s" but its possible formats are ' \
-                            'N (milliseconds assumed), Nus, Nms, Ns.\n%s' %
-                            (itemKey, index, delay, error))
+        except ValueError as error:
+            raise LayoutError, LayoutError('%s "%s" in item #%d failed to be parsed:\n%s' %
+                                          (itemKey, delay, index, error)), sys.exc_info()[2]
     return delay
 
 
 #
 # Function parses rate of the left/right half of the dumbbell topology for the flows of the item.
-# In case of error throws an exception.
 # param [in] item    - layout item
 # param [in] index   - index of the layout item
 # param [in] itemKey - key name of the item: "left-rate" or "right-rate"
+# throws LayoutError
 # returns rate in Mbps of the left/right half of the dumbbell topology for the flows of the item
 #
 def parse_flows_rate(item, index, itemKey):
@@ -166,8 +197,8 @@ def parse_flows_rate(item, index, itemKey):
         rate = float(0)
     else:
         if not isinstance(rate, (int, float)):
-            raise Exception('%s in item #%d is "%s" but if present it should be ' \
-                            'float or integer (unit is Mbps)' % (itemKey, index, rate))
+            raise LayoutError('%s in item #%d is "%s" but if present it should be ' \
+                              'float or integer (unit is Mbps)' % (itemKey, index, rate))
         rate = float(rate)
 
     return rate
@@ -175,149 +206,146 @@ def parse_flows_rate(item, index, itemKey):
 
 #
 # Function parses direction of flows of the layout item.
-# In case of error throws an exception.
 # param [in] item  - layout item
 # param [in] index - index of the layout item
+# throws LayoutError
 # returns processed direction of flows of the layout item
 #
 def parse_flows_direction(item, index):
     direction = item.get(DIRECTION)
 
     if direction not in [LEFTWARD, RIGHTWARD]:
-        raise Exception('Direction in item #%d is "%s" but it should either "%s" or "%s"' %
-                        (index, direction, LEFTWARD, RIGHTWARD))
+        raise LayoutError('Direction in item #%d is "%s" but it should either "%s" or "%s"' %
+                         (index, direction, LEFTWARD, RIGHTWARD))
 
     return direction
 
 
 #
 # Function parses second on which flows of the layout item should be started.
-# In case of error throws an exception.
 # param [in] item    - layout item
 # param [in] index   - index of the layout item
 # param [in] runtime - runtime of testing in seconds
+# throws LayoutError
 # returns second on which flows of the layout item should be started
 #
 def parse_item_flows_start(item, index, runtime):
     start = item.get(START)
 
     if not isinstance(start, int) or start < 0 or start >= runtime:
-        raise Exception('Start in item #%d is "%s" but it should be integer from 0 to %d' %
-                        (index, start, runtime - 1))
+        raise LayoutError('Start in item #%d is "%s" but it should be integer from 0 to %d' %
+                         (index, start, runtime - 1))
 
     return start
 
 
 #
 # Function parses number of flows of layout item.
-# In case of error throws an exception.
 # param [in] item  - layout item
 # param [in] index - index of the layout item
+# throws LayoutError
 # returns processed number of flows of the layout item
 #
 def parse_item_flows_number(item, index):
     flows = item.get(FLOWS)
 
     if not isinstance(flows, int) or flows <= 0:
-        raise Exception('Flows in item #%d is "%s" but it should be positive integer' %
-                       (index, flows))
+        raise LayoutError('Flows in item #%d is "%s" but it should be positive integer' %
+                         (index, flows))
 
     return flows
 
 
 #
 # Function determines who runs first: the sender or the receiver of the scheme.
-# In case of error throws an exception.
 # param [in] scheme      - scheme name
 # param [in] pantheonDir - path of Pantheon directory
+# throws LayoutError
 # returns who runs first: sender or receiver
 #
 def who_runs_first(scheme, pantheonDir):
     schemePath = os.path.join(pantheonDir, WRAPPERS_PATH, "%s.py" % scheme)
 
     if not os.path.exists(schemePath):
-        raise Exception('Path of scheme "%s" does not exist:\n%s' % (scheme, schemePath))
+        raise LayoutError('Path of scheme "%s" does not exist:\n%s' % (scheme, schemePath))
 
     runsFirst  = subprocess.check_output([schemePath, 'run_first']).strip()
 
     if runsFirst != RECEIVER and runsFirst != SENDER:
-        raise Exception('Scheme "%s" does not tell if "receiver" or "sender" runs first' % scheme)
+        raise LayoutError('Scheme "%s" does not tell if "receiver" or "sender" runs first' % scheme)
 
     return runsFirst
 
 
 #
 # Function parses scheme of layout item.
-# In case of error throws an exception.
 # param [in] item       - layout item
 # param [in] index      - index of the layout item
 # param [in] allSchemes - list of names of all the schemes present in Pantheon collection
+# throws LayoutError
 # returns processed scheme of the layout item
 #
 def parse_item_scheme(item, index, allSchemes):
     scheme = item.get(SCHEME)
 
     if scheme not in allSchemes:
-        raise Exception('Scheme "%s" in item #%d is not present in Pantheon collection' %
-                        (scheme, index))
+        raise LayoutError('Scheme "%s" in item #%d is not present in Pantheon collection' %
+                         (scheme, index))
 
     return scheme
 
 
 #
-# Function processes Pantheon config file with schemes listed.
-# In case of error throws an exception.
+# Function loads layout yaml-file.
+# param [in] layoutPath - path of the layout yaml-file
+# throws LayoutError
+# returns contents of the layout yaml-file
+#
+def load_layout_file(layoutPath):
+    try:
+        return yaml.load(open(layoutPath, 'r'))
+    except Exception as error:
+        raise LayoutError("Failed to load layout yaml-file:\n%s" % error)
+
+
+#
+# Function loads Pantheon config file with schemes listed.
 # param [in] pantheonDir - Pantheon directory path
+# throws LayoutError
 # returns list of schemes
 #
-def parse_pantheon_config(pantheonDir):
+def load_pantheon_config(pantheonDir):
     pantheonPath = os.path.join(pantheonDir, PANTHEON_CONFIG_PATH)
 
-    if not os.path.exists(pantheonPath):
-        raise Exception('Pantheon configuration file does not exist by path:\n%s' % pantheonPath)
-
-    with open(pantheonPath) as pantheonConfig:
-        return yaml.load(pantheonConfig)[SCHEMES].keys()
+    try:
+        with open(pantheonPath) as pantheonConfig:
+            return yaml.load(pantheonConfig)[SCHEMES].keys()
+    except Exception as error:
+        raise LayoutError("Failed to load Pantheon configuration file:\n%s" % error)
 
 
 #
-# Function parses time string in the formats: N (milliseconds assumed), Nus, Nms, Ns.
-# In case of parsing errors the function throws exception.
-# param [in] timeString - time string
-# param [in] maxDelay   - maximum possible delay in microseconds
+# Function processes time argument
+# param [in] argName   - time argument name
+# param [in] timeArg   - time argument value
+# param [in] maxTimeUs - maximum possible input time value in microseconds
+# throws ArgsError
 # returns time in microseconds
 #
-def parse_time_str(timeString, maxDelay):
-    timeString = timeString.strip()
-
+def process_time_arg(argName, timeArg, maxTimeUs):
     try:
-        if timeString.endswith("us"):
-            time = int(float(timeString[:-2]))
-        elif timeString.endswith("ms"):
-            time = int(float(timeString[:-2]) * 1e3)
-        elif timeString.endswith("s"):
-            time = int(float(timeString[:-1]) * 1e6)
-        else:
-            time = int(float(timeString) * 1e3)
-    except ValueError:
-        raise Exception('Invalid time "%s".' % timeString)
-
-    if time < 0:
-        raise Exception('Invalid time "%s". Time should be non-negative.' % timeString)
-
-    if time > maxDelay:
-        raise Exception('Invalid time "%s". Time should be less than %d us.' %
-                       (timeString, maxDelay))
-
-    return time
+        return parse_time_str(timeArg, maxTimeUs)
+    except ValueError as error:
+        raise ArgsError, ArgsError('Processing of argument "%s" failed:\n%s' %
+                                  (argName, error)), sys.exc_info()[2]
 
 
 #
 # Function returns path of layout yaml-file. If the file does not exist it creates a default one.
-# In case of processing errors the function throws exception.
 # param [in] layoutArg - parsed argument with the path of the layout yaml-file
 # param [in] runtime   - runtime of testing in seconds
 # param [in] rate      - rate in Mbps of the central link of the dumbbell topology
+# throws ArgsError
 # returns the path of the layout yaml-file
 #
 def process_layout_argument(layoutArg, runtime, rate):
@@ -325,7 +353,7 @@ def process_layout_argument(layoutArg, runtime, rate):
         layoutPath = os.path.realpath(os.path.expanduser(args.layout))
 
         if not os.path.exists(layoutPath):
-            raise Exception('Layout yaml-file %s does not exist' % layoutPath)
+            raise ArgsError('Layout yaml-file %s does not exist' % layoutPath)
     else:
         layoutPath = os.path.realpath(os.path.expanduser(DEFAULT_LAYOUT_PATH))
 
@@ -337,14 +365,14 @@ def process_layout_argument(layoutArg, runtime, rate):
 
 #
 # Function returns the size of the transmit queue of a router depending on arguments passed by user.
-# In case of processing errors the function throws exception.
 # param [in] oneQueueArg   - parsed argument with the size of the queue of the router
 # param [in] bothQueuesArg - parsed argument with the common size of the queues of both the routers
+# throws ArgsError
 # returns the size of the transmit queue of the router
 #
 def process_queue_argument(oneQueueArg,  bothQueuesArg):
     if bothQueuesArg is not None and oneQueueArg is not None:
-        raise Exception('--queues cannot be used together with --left-queue or --right-queue')
+        raise ArgsError('--queues cannot be used together with --left-queue or --right-queue')
 
     if oneQueueArg is not None:
         queueSize = oneQueueArg
@@ -367,7 +395,7 @@ def add_arguments(parser):
     help='Output directory, default is "dumps". Service file metadata.json containing parameters '
          'with which testing is actually performed is written there. For each flow, pcap-files, '
          'recorded at interfaces of the two hosts between which the flow runs, are written there '
-         'named in the format <flow #>-<scheme>-<sender/receiver>.pcap')
+         'named "<flow\'s starting #>-<scheme>-<sender/receiver>.pcap"')
 
     parser.add_argument('-p', '--pantheon', required=True, metavar='DIR',
     help='Pantheon [pantheon.stanford.edu] directory where congestion control schemes are searched')
@@ -441,25 +469,39 @@ def save_metadata(processedArgs, parsedLayout):
 
 
 #
+# Custom Exception class for errors connected to parsing of layout
+#
+class LayoutError(Exception):
+    pass
+
+
+#
+# Custom Exception class for errors connected to processing of arguments
+#
+class ArgsError(Exception):
+    pass
+
+
+#
 # Function parses layout yaml-file.
-# In case of parsing errors the function throws exception.
 # param [in] layoutPath  - path of the layout yaml-file
 # param [in] runtime     - runtime of testing in seconds
 # param [in] pantheonDir - path of Pantheon directory
 # param [in] maxDelay    - maximum possible delay in microseconds
+# throws LayoutError
 # returns parsed layout
 #
 def parse_layout(layoutPath, runtime, pantheonDir, maxDelay):
     layout     = []
-    allSchemes = parse_pantheon_config(pantheonDir)
-    itemsArray = yaml.load(open(layoutPath, 'r'))
+    allSchemes = load_pantheon_config(pantheonDir)
+    itemsArray = load_layout_file    (layoutPath)
 
     if not isinstance(itemsArray, list) or len(itemsArray) == 0:
-        raise Exception('Data in yaml-file should be non-empty array of dictionaries')
+        raise LayoutError('Data in yaml-file should be non-empty array of dictionaries')
 
     for index, item in enumerate(itemsArray, start=1):
         if not isinstance(item, dict):
-            raise Exception('Item #%d of yaml-file is not dictionary but it should be' % index)
+            raise LayoutError('Item #%d of yaml-file is not a dictionary but it must be' % index)
 
         entry = { }
 
@@ -488,8 +530,8 @@ def parse_layout(layoutPath, runtime, pantheonDir, maxDelay):
 
 #
 # Function validates and adjusts arguments parsed by argparse parser.
-# In case of processing errors the function throws exception.
 # param [in] args - arguments parsed by argparse parser
+# throws ArgsError
 # returns processed arguments
 #
 def process_arguments(args):
@@ -498,7 +540,7 @@ def process_arguments(args):
     output[RUNTIME] = args.runtime
 
     if output[RUNTIME] > 60 or output[RUNTIME] <= 0:
-        raise Exception('Runtime cannot be non-positive or greater than 60 seconds')
+        raise ArgsError('Runtime cannot be non-positive or greater than 60 seconds')
 
     output[DIR] = os.path.realpath(os.path.expanduser(args.dir))
 
@@ -508,7 +550,7 @@ def process_arguments(args):
     output[PANTHEON] = os.path.realpath(os.path.expanduser(args.pantheon))
 
     if not os.path.exists(output[PANTHEON]):
-        raise Exception('Pantheon directory %s does not exist' % output[PANTHEON])
+        raise ArgsError('Pantheon directory %s does not exist' % output[PANTHEON])
 
     output[RATE       ] = args.rate
     output[MAX_DELAY  ] = args.max_delay
@@ -517,13 +559,13 @@ def process_arguments(args):
     output[RIGHT_QUEUE] = process_queue_argument (args.right_queue, args.queues)
     output[LAYOUT_PATH] = process_layout_argument(args.layout,      output[RUNTIME], output[RATE])
 
-    output[BASE       ] = parse_time_str(args.base,   output[MAX_DELAY])
-    output[DELTA      ] = parse_time_str(args.delta,  output[MAX_DELAY])
-    output[STEP       ] = parse_time_str(args.step,   output[MAX_DELAY])
-    output[JITTER     ] = parse_time_str(args.jitter, output[MAX_DELAY]) if args.jitter else 0
+    output[BASE  ] = process_time_arg(BASE,   args.base,   output[MAX_DELAY])
+    output[DELTA ] = process_time_arg(DELTA,  args.delta,  output[MAX_DELAY])
+    output[STEP  ] = process_time_arg(STEP,   args.step,   output[MAX_DELAY])
+    output[JITTER] = process_time_arg(JITTER, args.jitter, output[MAX_DELAY]) if args.jitter else 0
 
     if output[DELTA] < 10000:
-        raise Exception('Delta time less than 10ms makes no sense, as tc qdisc change takes ~4ms.')
+        raise ArgsError('Delta time less than 10ms makes no sense, as tc qdisc change takes ~4ms.')
 
     return output
 
@@ -569,14 +611,14 @@ if __name__ == '__main__':
     args = parse_arguments()
 
     try:
-        args = process_arguments(args)
-    except Exception as error:
+        args   = process_arguments(args)
+
+        layout = parse_layout(args[LAYOUT_PATH], args[RUNTIME], args[PANTHEON], args[MAX_DELAY])
+
+    except ArgsError as error:
         print("Arguments processing failed:\n%s" % error)
         sys.exit(1)
-
-    try:
-        layout = parse_layout(args[LAYOUT_PATH], args[RUNTIME], args[PANTHEON], args[MAX_DELAY])
-    except Exception as error:
+    except LayoutError as error:
         print("Layout parsing failed:\n%s" % error)
         sys.exit(1)
 
