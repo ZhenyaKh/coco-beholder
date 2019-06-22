@@ -23,6 +23,7 @@ JITTER               = '_jitter'
 RATE                 = '_rate'
 MAX_DELAY            = '_max-delay'
 SEED                 = '_seed'
+BUFFER               = '_buffer'
 PANTHEON_CONFIG_PATH = 'src/config.yml'
 SCHEMES              = 'schemes'
 FLOWS                = 'flows'
@@ -43,6 +44,7 @@ RECEIVER             = 'receiver'
 WRAPPERS_PATH        = 'src/wrappers'
 RUNS_FIRST           = 'runs-first'
 DEFAULT_QUEUE_SIZE   = 1000
+KIB_IN_MIB           = 1024
 
 
 #
@@ -422,6 +424,10 @@ def add_arguments(parser):
          'The parameter is useful if one wants to reproduce results of testing in which delay '
          'variability feature was used.')
 
+    parser.add_argument('-b', '--buffer', default=2, type=int, choices=xrange(1, 101), metavar='MB',
+    help='Set the operating system capture buffer size to chosen number of MiB (1024 KiB), '
+         'default is 2 MiB. The value is set as -B option for tcpdump recordings on all hosts.')
+
     add_queue_arguemnts(parser)
 
 
@@ -452,6 +458,7 @@ def save_metadata(processedArgs, parsedLayout):
         RUNTIME       : processedArgs[RUNTIME    ],
         MAX_DELAY     : processedArgs[MAX_DELAY  ],
         SEED          : processedArgs[SEED       ],
+        BUFFER        : processedArgs[BUFFER     ],
         LEFT_QUEUE    : processedArgs[LEFT_QUEUE ],
         RIGHT_QUEUE   : processedArgs[RIGHT_QUEUE],
         BASE          : processedArgs[BASE       ],
@@ -555,6 +562,7 @@ def process_arguments(args):
     output[RATE       ] = args.rate
     output[MAX_DELAY  ] = args.max_delay
     output[SEED       ] = args.seed
+    output[BUFFER     ] = args.buffer * KIB_IN_MIB
     output[LEFT_QUEUE ] = process_queue_argument (args.left_queue,  args.queues)
     output[RIGHT_QUEUE] = process_queue_argument (args.right_queue, args.queues)
     output[LAYOUT_PATH] = process_layout_argument(args.layout,      output[RUNTIME], output[RATE])
