@@ -701,6 +701,7 @@ class Test(object):
                 except OSError:
                     pass
 
+
     #
     # Method checks if kernel dropped any packets by checking tcpdump output on its termination
     #
