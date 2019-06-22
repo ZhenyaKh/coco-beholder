@@ -711,7 +711,7 @@ class Test(object):
         for popens in [self.senderDumpPopens, self.receiverDumpPopens]:
             for popen in popens:
                 output = popen.communicate()[1]
-                result = re.search('(\d+) packets dropped by kernel', output)
+                result = re.search('(\d+) packets dropped', output)
                 droppedPackets += int(result.group(1))
 
         if droppedPackets != 0:

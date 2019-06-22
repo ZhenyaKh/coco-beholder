@@ -636,7 +636,7 @@ if __name__ == '__main__':
 
         print("Testing:")
 
-        subprocess.call(['sudo', 'python', 'test1.py', user, args[DIR], args[PANTHEON]])
+        subprocess.call(['sudo', 'python', 'test.py', user, args[DIR], args[PANTHEON]])
 
         subprocess.call(['sudo', 'mn', '-c', '--verbosity=output'])
 
