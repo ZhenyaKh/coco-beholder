@@ -7,9 +7,11 @@ import random
 import ipaddress
 import subprocess
 from subprocess import PIPE
-from itertools import chain
 from time import sleep
 import time
+import signal
+import threading
+from multiprocessing import Pool, cpu_count
 
 from mininet.net import Mininet
 from mininet.net import CLI
@@ -18,19 +20,19 @@ USER                = 1
 DIR                 = 2
 PANTHEON            = 3
 METADATA_NAME       = 'metadata.json'
-LEFT_QUEUE          = 'left-queue'
-RIGHT_QUEUE         = 'right-queue'
-LAYOUT              = 'layout'
-BASE                = 'base'
-DELTA               = 'delta'
-STEP                = 'step'
-JITTER              = 'jitter'
-RATE                = 'rate'
-MAX_DELAY           = 'max-delay'
-SEED                = 'seed'
-RUNTIME             = 'runtime'
+LEFT_QUEUE          = '_left-queue'
+RIGHT_QUEUE         = '_right-queue'
+SORTED_LAYOUT       = 'sorted-layout'
+BASE                = '_base'
+DELTA               = '_delta'
+STEP                = '_step'
+JITTER              = '_jitter'
+RATE                = '_rate'
+MAX_DELAY           = '_max-delay'
+SEED                = '_seed'
+RUNTIME             = '_runtime'
 FLOWS               = 'flows'
-ALL_FLOWS           = 'all-flows'
+ALL_FLOWS           = '_all-flows'
 SCHEME              = 'scheme'
 LEFT_RATE           = 'left-rate'
 RIGHT_RATE          = 'right-rate'
@@ -61,6 +63,15 @@ DEFAULT_QUEUE_SIZE  = 1000
 LEFTWARD            = '<-'
 RIGHTWARD           = '->'
 PORT                = 50000
+SECOND              = 1.0
+TIMEOUT_SEC         = 5.0
+
+
+#
+# Custom Exception class for errors connected to actual testing
+#
+class TestError(Exception):
+    pass
 
 
 #
@@ -68,6 +79,20 @@ PORT                = 50000
 #
 class MetadataError(Exception):
     pass
+
+
+globalClients    = [] # Global array of client hosts               -- for multiprocessing map
+globalClientCmds = [] # Global array of commands to launch clients -- for multiprocessing map
+
+
+#
+# Global function which launches flow's client -- for multiprocessing map
+#
+def start_client(flowId):
+    print(flowId)
+    x = globalClients[flowId].popen(globalClientCmds[flowId])
+    print("%f" % time.time())
+    return x
 
 
 #
@@ -82,9 +107,9 @@ class Test(object):
     # throws MetadataError
     #
     def __init__(self, user, dir, pantheon):
-        self.user     = user     # name of user who runs the testing
-        self.dir      = dir      # full path of output directory
-        self.pantheon = pantheon # full path to Pantheon directory
+        self.user      = user              # name of user who runs the testing
+        self.dir       = dir               # full path of output directory
+        self.pantheon  = pantheon          # full path to Pantheon directory
 
         metadata = self.load_metadata()
         self.baseUs         = metadata[BASE       ] # initial netem delay at central links
@@ -99,61 +124,79 @@ class Test(object):
         self.rightQueuePkts = metadata[RIGHT_QUEUE] # size of transmit queue of right router
         self.flows          = metadata[ALL_FLOWS  ] # total number of flows
 
-        perFlowLayout = self.compute_per_flow_layout(metadata[LAYOUT])  # sorted by start
-        self.directions     = [ i[DIRECTION  ] for i in perFlowLayout ] # per flow directions
-        self.leftDelaysUs   = [ i[LEFT_DELAY ] for i in perFlowLayout ] # per flow left delays
-        self.rightDelaysUs  = [ i[RIGHT_DELAY] for i in perFlowLayout ] # per flow right delays
-        self.leftRatesMbps  = [ i[LEFT_RATE  ] for i in perFlowLayout ] # per flow left rates
-        self.rightRatesMbps = [ i[RIGHT_RATE ] for i in perFlowLayout ] # per flow right rates
-        self.runsFirst      = [ i[RUNS_FIRST ] for i in perFlowLayout ] # per flow who runs first
-        self.schemes        = [ i[SCHEME     ] for i in perFlowLayout ] # per flow scheme names
-        self.schemePaths    = self.compute_schemes_paths()              # schemes' paths
-
-        # arrays of delta times and of corresponding delays -- to variate central link netem delay
-        self.deltasArraySec,   self.delaysArrayUs = self.compute_steps()
-        # array of time intervals to sleep and array of arrays of flow ids to start after each sleep
-        self.intervalsToSleep, self.flowsToStart  = self.compute_starts_schedule(perFlowLayout)
+        layout = self.compute_per_flow_layout(metadata[SORTED_LAYOUT])
+        self.directions     = [ flow[DIRECTION  ] for flow in layout ] # per flow directions
+        self.leftDelaysUs   = [ flow[LEFT_DELAY ] for flow in layout ] # per flow left delays
+        self.rightDelaysUs  = [ flow[RIGHT_DELAY] for flow in layout ] # per flow right delays
+        self.leftRatesMbps  = [ flow[LEFT_RATE  ] for flow in layout ] # per flow left rates
+        self.rightRatesMbps = [ flow[RIGHT_RATE ] for flow in layout ] # per flow right rates
+        self.runsFirst      = [ flow[RUNS_FIRST ] for flow in layout ] # per flow who runs first
+        self.schemes        = [ flow[SCHEME     ] for flow in layout ] # per flow scheme names
+        self.schemePaths    = self.compute_schemes_paths()             # schemes' paths
 
         self.network            = None # Mininet network
-        self.leftHosts          = None # hosts at left half of the dumbbell topology
         self.leftRouter         = None # router interconnecting left hosts
-        self.rightHosts         = None # hosts at right half of the dumbbell topology
         self.rightRouter        = None # router interconnecting right hosts
+        self.leftHosts          = None # hosts at left half of the dumbbell topology
+        self.rightHosts         = None # hosts at right half of the dumbbell topology
+        self.leftNetemCmd       = None # template of netem cmd for central link -- for left router
+        self.rightNetemCmd      = None # template of netem cmd for central link -- for right router
+
         self.senderDumpPopens   = []   # per flow tcpdump processes recording at the flow's sender
         self.receiverDumpPopens = []   # per flow tcpdump processes recording at the flow's receiver
-        self.serverPopens       = []   # per flow server processes
-        self.clientsPopens      = []   # per flow client processes
-        self.clients            = []   # per flow client hosts
-        self.clientsCmds        = []   # per flow commands to launch clients
-        for i in perFlowLayout:
-            print("%s\n" % i)
+        self.serverPopens       = []   # per flow processes of launched servers
+        self.clientPopens       = []   # per flow processes of launched clients
 
+        # arrays of delta times and of corresponding delays -- to variate central link netem delay
+        self.deltasArraySec,     self.delaysArrayUs        = self.compute_delay_steps()
+        # per flow link to container keeping sender/receiver processes
+        self.senderPopenHolders, self.receiverPopenHolders = self.compute_popen_holders()
+
+        self.startsSchedule = self.compute_starts_schedule(layout) # schedule of starting flows
+        self.startEvent     = threading.Event()                    # sync with thread starting flows
+        self.clients        = globalClients    # per flow client hosts
+        self.clientCmds     = globalClientCmds # per flow commands to launch clients
+        self.pool           = None             # pool of processes launching clients
 
 
     #
-    #
+    # Method runs actual testing
+    # throws TestError
     #
     def test(self):
-        random.seed(self.seed)
+        try:
+            random.seed(self.seed)
+            print("Total number of flows is %d" % self.flows)
+            print("Flows have been sorted by their start")
 
-        print("Total number of flows is %d" % self.flows)
-        print("Flows will be laid out in the topology by order of their start")
-        print("Creating the dumbbell topology...")
-        self.build_dumbbell_network()
-        print("Setting schemes up after reboot...")
-        self.setup_schemes_after_reboot()
-        print("Setting rates, delays and queue sizes at the topology's interfaces...")
-        self.setup_interfaces_qdisc()
-        print("Starting tcpdump recordings at hosts...")
-        print("See help to learn naming format of pcap-files")
-        self.start_tcpdump_recordings()
-        print("Starting servers...")
-        self.start_servers()
-        print("Starting clients and varying delay...")
-        self.start_clients()
+            print("Creating the dumbbell topology...")
+            self.build_dumbbell_network()
+            print("Setting schemes up after reboot...")
+            self.setup_schemes_after_reboot()
+            print("Setting rates, delays and queue sizes at the topology's interfaces...")
+            self.setup_interfaces_qdisc()
+            print("Starting tcpdump recordings at hosts...")
+            self.start_tcpdump_recordings()
+            print("Starting servers...")
+            self.start_servers()
 
+            print("Starting clients and optionally varying delay...")
+            self.pool = self.start_pool()
+            thread    = threading.Thread(target=self.start_clients)
+            thread.start()
+            self.startEvent.wait(TIMEOUT_SEC)
+            self.perform_tc_delay_changes()
+            thread.join()
 
-
+            print("Killing descendent processes properly...")
+            self.kill_processes_properly()
+            self.finish_pool()
+        except:
+            print("Unexpected event occurred during testing! Emergency exit:")
+            print("Killing descendent processes emergently...")
+            self.finish_pool()
+            self.kill_processes_emergently()
+            raise
 
 
     #
@@ -177,10 +220,10 @@ class Test(object):
 
     #
     # Method generates layout for each flow depending on number of flows in each entry of "layout"
-    # field of metadata. Flows are sorted by their starting points.
+    # field of metadata.
     # param [in] layout - metadata layout
     # throws MetadataError
-    # returns per flow layout sorted by the flow's starting point
+    # returns per flow layout
     #
     def compute_per_flow_layout(self, layout):
         perFlowLayout = []
@@ -191,7 +234,7 @@ class Test(object):
         # sanity check
         if len(perFlowLayout) != self.flows:
             raise MetadataError('Insanity: field "%s"=%d must be %d (sum of all "%s" in "%s")!!!' %
-                               (ALL_FLOWS, self.flows, len(perFlowLayout), FLOWS, LAYOUT))
+                               (ALL_FLOWS, self.flows, len(perFlowLayout), FLOWS, SORTED_LAYOUT))
 
         subnetsNumber  = 2**(SUPERNET_SIZE - SUBNET_SIZE)
         maxFlowsNumber = (subnetsNumber - 1) / 2
@@ -199,8 +242,6 @@ class Test(object):
         if len(perFlowLayout) > maxFlowsNumber:
             raise MetadataError('Flows number is %d but, with supernet %s, max flows number is %d' %
                                (len(perFlowLayout), SUPERNET_ADDRESS, maxFlowsNumber))
-
-        perFlowLayout = sorted(perFlowLayout, key=lambda flow: flow[START])
 
         return perFlowLayout
 
@@ -225,6 +266,85 @@ class Test(object):
                 schemePaths[scheme] = schemePath
 
         return schemePaths
+
+
+    #
+    # Method generates arrays of delta times and corresponding delays for future
+    # delay variability of the central link of the dumbbell topology
+    # throws MetadataError
+    # returns array of delta times in seconds, array of corresponding delays in us
+    #
+    def compute_delay_steps(self):
+        runtimeUs       = self.runtimeSec * USEC_PER_SEC
+        deltasNumber    = runtimeUs / self.deltaUs
+        reminderDeltaUs = runtimeUs % self.deltaUs
+        deltasSecArray  = [float(self.deltaUs) / USEC_PER_SEC] * deltasNumber
+
+        if reminderDeltaUs != 0:
+            deltasSecArray.append(float(reminderDeltaUs) / USEC_PER_SEC)
+
+        delayUs       = self.baseUs
+        delaysUsArray = [delayUs]
+
+        if delayUs + self.stepUs > self.maxDelayUs and delayUs - self.stepUs < 0:
+            raise MetadataError("Schedule of delay's changes for the central link of the dumbbell "
+                                "topology cannot be generated because step is too big")
+
+        for _ in deltasSecArray[1:]:
+            signs = []
+
+            if delayUs + self.stepUs <= self.maxDelayUs:
+                signs.append(INCREASE)
+            if delayUs - self.stepUs >= 0:
+                signs.append(DECREASE)
+
+            delayUs += self.stepUs * random.choice(signs)
+            delaysUsArray.append(delayUs)
+
+        return deltasSecArray, delaysUsArray
+
+
+    #
+    # Method generates schedule to start flows: intervals of sleeping and for each interval a list
+    # of ids of flows to start after the sleep
+    # param [in] perFlowLayout - per flow layout sorted by flow's start
+    # returns schedule to start flows
+    #
+    def compute_starts_schedule(self, perFlowLayout):
+        startsSchedule = [[] for _ in range(perFlowLayout[-1][START] + 1)]
+        previousStart  = 0
+
+        for flowId, flow in enumerate(perFlowLayout):
+            flowStart = flow[START]
+
+            startsSchedule[flowStart].append(flowId)
+
+            if flowStart < previousStart: # sanity check
+                raise MetadataError("Insanity: layout entries must be sorted by start field!!!")
+
+            previousStart = flowStart
+
+        return startsSchedule
+
+
+    #
+    # Method computes per flow link to container keeping sender/receiver processes
+    # returns array of links to containers keeping sender's processes and array of links to
+    # containers keeping receiver's processes
+    #
+    def compute_popen_holders(self):
+        senderPopenHolders   = []
+        receiverPopenHolders = []
+
+        for i in range(0, self.flows):
+            if self.runsFirst[i] == RECEIVER:
+                senderPopenHolders  .append(self.clientPopens)
+                receiverPopenHolders.append(self.serverPopens)
+            else:
+                senderPopenHolders.  append(self.serverPopens)
+                receiverPopenHolders.append(self.clientPopens)
+
+        return senderPopenHolders, receiverPopenHolders
 
 
     #
@@ -274,10 +394,9 @@ class Test(object):
     def setup_schemes_after_reboot(self):
         for schemePath in self.schemePaths.values():
             try:
-                subprocess.check_call([schemePath, 'setp_after_reboot'], stdout=PIPE, stderr=PIPE)
-            except subprocess.CalledProcessError:
-                print("!")
-
+                subprocess.check_call([schemePath, 'setup_after_reboot'], stdout=PIPE, stderr=PIPE)
+            except subprocess.CalledProcessError as error:
+                raise TestError(error)
 
 
     #
@@ -286,17 +405,24 @@ class Test(object):
     def setup_interfaces_qdisc(self):
         # setting netem for the central link of the dumbbell topology
 
-        netemCmd = 'tc qdisc add dev %s root netem delay %dus %dus rate %sMbit limit %d'
+        netemCmd = \
+            'tc qdisc replace dev {0} root netem delay %dus {1:d}us rate {2:f}Mbit limit {3:d}'
 
-        self.leftRouter. cmd(netemCmd % (self.leftRouter.intfs[self.flows], self.delaysArrayUs[0],
-                                         self.jitterUs, self.rateMbps, self.leftQueuePkts))
+        leftIntf  = self.leftRouter. intfs[self.flows]
+        rightIntf = self.rightRouter.intfs[self.flows]
 
-        self.rightRouter.cmd(netemCmd % (self.rightRouter.intfs[self.flows], self.delaysArrayUs[0],
-                                         self.jitterUs, self.rateMbps, self.rightQueuePkts))
+        self.leftNetemCmd  = netemCmd.format(leftIntf,
+                                             self.jitterUs, self.rateMbps, self.leftQueuePkts)
+
+        self.rightNetemCmd = netemCmd.format(rightIntf,
+                                             self.jitterUs, self.rateMbps, self.rightQueuePkts)
+
+        self.leftRouter. cmd(self.leftNetemCmd  % self.delaysArrayUs[0])
+        self.rightRouter.cmd(self.rightNetemCmd % self.delaysArrayUs[0])
 
         # setting netem for all the links in the left and right halves of the dumbbell topology
 
-        netemCmd = 'tc qdisc add dev %s root netem delay %dus rate %sMbit limit %d'
+        netemCmd = 'tc qdisc replace dev %s root netem delay %dus rate %fMbit limit %d'
 
         for i in range(0, self.flows):
             self.leftRouter.   cmd(netemCmd % (self.leftRouter.intfs[i],  self.leftDelaysUs[i],
@@ -382,91 +508,134 @@ class Test(object):
 
             clientCmd = ['sudo', '-u', self.user, schemePath, runsSecond, server.IP(), str(PORT)]
 
-            self.clients.    append(client)
-            self.clientsCmds.append(clientCmd)
+            self.clients.   append(client)
+            self.clientCmds.append(clientCmd)
+
+
+    #
+    # Method starts multiprocessing pool with processes which will start clients. Size of pool is
+    # computed as minimum between the number of cores minus one and the maximum number of flows
+    # which will be started simultaneously, i.e. the maximum number of flows with same start value.
+    # returns multiprocessing pool
+    #
+    def start_pool(self):
+        print(self.startsSchedule)
+        print("!!!!", len(max(self.startsSchedule, key=lambda x: len(x))))
+        print(min(cpu_count() - 1, len(max(self.startsSchedule, key=lambda x: len(x)))))
+
+        originalSigintHandler = signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+        pool = Pool(min(cpu_count() - 1, len(max(self.startsSchedule, key=lambda x: len(x)))))
+
+        signal.signal(signal.SIGINT, originalSigintHandler)
+
+        return pool
 
 
     #
     # Method starts clients for each flow
     #
     def start_clients(self):
-        benchmarkStart = time.time()  # TODO: remove benchmark
+        benchmarkStart = timeStart = time.time() # TODO: remove benchmark
 
-        intervalIndex  = 0
-        totalIntervals = len(self.intervalsToSleep)
+        self.clientPopens.extend(self.pool.map(start_client, self.startsSchedule[0]))
+        print("!", time.time() - benchmarkStart)
 
-        while True:
-            for flowId in self.flowsToStart[intervalIndex]:
+        self.startEvent.set()
 
-                self.clientsPopens.append(self.clients[flowId].popen(self.clientsCmds[flowId]))
+        for i in range(1, len(self.startsSchedule)):
+            sleep(SECOND - ((time.time() - timeStart) % SECOND))
 
-            intervalIndex += 1
+            self.clientPopens.extend(self.pool.map(start_client, self.startsSchedule[i]))
+            print("#", time.time())
 
-            if intervalIndex == totalIntervals:
-                break
-            else:
-                sleep(self.intervalsToSleep[intervalIndex])
-
-        print("Starting clients completed after %f seconds" % (time.time() - benchmarkStart))
+        print("debug benchmark 1: %f" % (time.time() - benchmarkStart))
 
 
     #
-    # Method generates arrays of delta times and corresponding delays for future
-    # delay variability of the central link of the dumbbell topology
-    # throws MetadataError
-    # returns array of delta times in seconds, array of corresponding delays in us
+    # Method performs netem delay changes on interfaces of the two routers of the dumbbell topology
     #
-    def compute_steps(self):
-        runtimeUs       = self.runtimeSec * USEC_PER_SEC
-        deltasNumber    = runtimeUs / self.deltaUs
-        reminderDeltaUs = runtimeUs % self.deltaUs
-        deltasSecArray  = [float(self.deltaUs) / USEC_PER_SEC] * deltasNumber
+    def perform_tc_delay_changes(self):
+        benchmarkStart = time.time() # TODO: remove benchmark
+        sleep(self.deltasArraySec[0])
 
-        if reminderDeltaUs != 0:
-            deltasSecArray.append(float(reminderDeltaUs) / USEC_PER_SEC)
+        intervalsNumber = len(self.deltasArraySec)
 
-        delayUs       = self.baseUs
-        delaysUsArray = [delayUs]
+        if intervalsNumber != 1:
+            timeStart = time.time()
 
-        if delayUs + self.stepUs > self.maxDelayUs and delayUs - self.stepUs < 0:
-            raise MetadataError("Schedule of delay's changes for the central link of the dumbbell "
-                                "topology cannot be generated because step is too big")
+            for i in range(1, intervalsNumber - 1):
+                self.leftRouter. cmd(self.leftNetemCmd  % self.delaysArrayUs[i])
+                self.rightRouter.cmd(self.rightNetemCmd % self.delaysArrayUs[i])
+                sleep(self.deltasArraySec[i] - ((time.time() - timeStart) % self.deltasArraySec[i]))
 
-        for _ in deltasSecArray[1:]:
-            signs = []
+            timeStart = time.time()
 
-            if delayUs + self.stepUs <= self.maxDelayUs:
-                signs.append(INCREASE)
-            if delayUs - self.stepUs >= 0:
-                signs.append(DECREASE)
+            self.leftRouter. cmd(self.leftNetemCmd  % self.delaysArrayUs[-1])
+            self.rightRouter.cmd(self.rightNetemCmd % self.delaysArrayUs[-1])
+            sleep(self.deltasArraySec[-1] - ((time.time() - timeStart) % self.deltasArraySec[-1]))
 
-            delayUs += self.stepUs * random.choice(signs)
-            delaysUsArray.append(delayUs)
-
-        return deltasSecArray, delaysUsArray
+        print("debug benchmark 2: %f" % (time.time() - benchmarkStart))
 
 
     #
-    # Method generates schedule to start flows: intervals of sleeping and for each interval a list
-    # of ids of flows to start after the sleep
-    # param [in] perFlowLayout - per flow layout sorted by flow's start
+    # Method kills client, server and tcpdump processes
     #
-    def compute_starts_schedule(self, perFlowLayout):
-        intervalsToSleep = [ 0 ]
-        flowsToStart     = [ [] ]
-        previousStart    = 0
+    def kill_processes_properly(self):
+        for flowId, holder in enumerate(self.senderPopenHolders):
+            os.killpg(os.getpgid(holder[flowId].pid), signal.SIGKILL)
 
-        for index, flow in enumerate(perFlowLayout):
-            flowStart = flow[START]
+        for flowId, holder in enumerate(self.receiverPopenHolders):
+            os.killpg(os.getpgid(holder[flowId].pid), signal.SIGKILL)
 
-            if previousStart == flowStart:
-                flowsToStart[-1].append(index)
-            else:
-                intervalsToSleep.append(flowStart - previousStart)
-                flowsToStart    .append([ index ])
-                previousStart = flowStart
+        for dumpPopen in self.senderDumpPopens:
+            os.kill(dumpPopen.pid, signal.SIGTERM)
 
-        return intervalsToSleep, flowsToStart
+        for dumpPopen in self.receiverDumpPopens:
+            os.kill(dumpPopen.pid, signal.SIGTERM)
+
+        self.wait_child_processes()
+
+
+    #
+    # Method terminates and joins multiprocessing pool of processes which started clients
+    #
+    def finish_pool(self):
+        if self.pool is not None:
+            self.pool.terminate()
+            self.pool.join()
+            self.pool = None
+
+
+    #
+    # Method kills client, server and tcpdump processes in case of testing error
+    #
+    def kill_processes_emergently(self):
+        for clientPopen in self.clientPopens:
+            try:
+                os.killpg(os.getpgid(clientPopen.pid), signal.SIGKILL)
+            except OSError:
+                pass
+
+        for serverPopen in self.serverPopens:
+            try:
+                os.killpg(os.getpgid(serverPopen.pid), signal.SIGKILL)
+            except OSError:
+                pass
+
+        for dumpPopen in self.senderDumpPopens:
+            try:
+                os.kill(dumpPopen.pid, signal.SIGTERM)
+            except OSError:
+                pass
+
+        for dumpPopen in self.receiverDumpPopens:
+            try:
+                os.kill(dumpPopen.pid, signal.SIGTERM)
+            except OSError:
+                pass
+
+        self.wait_child_processes()
 
 
     #
@@ -512,6 +681,21 @@ class Test(object):
         return hosts, router
 
 
+    #
+    # Method removes zombies of child processes of the current script process
+    #
+    def wait_child_processes(self):
+
+        all = [self.clientPopens, self.serverPopens, self.senderDumpPopens, self.receiverDumpPopens]
+
+        for popens in all:
+            for popen in popens:
+                try:
+                    os.waitpid(popen.pid, 0)
+                except OSError:
+                    pass
+
+
 #
 # Entry function
 #
@@ -528,6 +712,11 @@ if __name__ == '__main__':
     except MetadataError as error:
         print("Metadata error:\n%s" % error)
         exitCode = EXIT_FAILURE
+    except TestError as error:
+        print("Testing error:\n%s"  % error)
+        exitCode = EXIT_FAILURE
+    except KeyboardInterrupt:
+        sys.exit(EXIT_FAILURE)
 
     exitMessage = SUCCESS_MESSAGE if exitCode == EXIT_SUCCESS else FAILURE_MESSAGE
     print(exitMessage)

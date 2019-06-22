@@ -11,23 +11,23 @@ import time
 
 DIR                  = 'dir'
 PANTHEON             = 'pantheon'
-LEFT_QUEUE           = 'left-queue'
-RIGHT_QUEUE          = 'right-queue'
+LEFT_QUEUE           = '_left-queue'
+RIGHT_QUEUE          = '_right-queue'
 DEFAULT_LAYOUT_PATH  = 'layout.yml'
 LAYOUT_PATH          = 'layout-path'
-LAYOUT               = 'layout'
-BASE                 = 'base'
-DELTA                = 'delta'
-STEP                 = 'step'
-JITTER               = 'jitter'
-RATE                 = 'rate'
-MAX_DELAY            = 'max-delay'
-SEED                 = 'seed'
+SORTED_LAYOUT        = 'sorted-layout'
+BASE                 = '_base'
+DELTA                = '_delta'
+STEP                 = '_step'
+JITTER               = '_jitter'
+RATE                 = '_rate'
+MAX_DELAY            = '_max-delay'
+SEED                 = '_seed'
 PANTHEON_CONFIG_PATH = 'src/config.yml'
 SCHEMES              = 'schemes'
 FLOWS                = 'flows'
-ALL_FLOWS            = 'all-flows'
-RUNTIME              = 'runtime'
+ALL_FLOWS            = '_all-flows'
+RUNTIME              = '_runtime'
 METADATA_NAME        = 'metadata.json'
 SCHEME               = 'scheme'
 START                = 'start'
@@ -448,18 +448,18 @@ class BlankLinesHelpFormatter (argparse.HelpFormatter):
 def save_metadata(processedArgs, parsedLayout):
     metadata =\
     {
-        RATE        : processedArgs[RATE       ],
-        RUNTIME     : processedArgs[RUNTIME    ],
-        MAX_DELAY   : processedArgs[MAX_DELAY  ],
-        SEED        : processedArgs[SEED       ],
-        LEFT_QUEUE  : processedArgs[LEFT_QUEUE ],
-        RIGHT_QUEUE : processedArgs[RIGHT_QUEUE],
-        BASE        : processedArgs[BASE       ],
-        DELTA       : processedArgs[DELTA      ],
-        STEP        : processedArgs[STEP       ],
-        JITTER      : processedArgs[JITTER     ],
-        LAYOUT      : parsedLayout,
-        ALL_FLOWS   : sum(entry[FLOWS] for entry in parsedLayout)
+        RATE          : processedArgs[RATE       ],
+        RUNTIME       : processedArgs[RUNTIME    ],
+        MAX_DELAY     : processedArgs[MAX_DELAY  ],
+        SEED          : processedArgs[SEED       ],
+        LEFT_QUEUE    : processedArgs[LEFT_QUEUE ],
+        RIGHT_QUEUE   : processedArgs[RIGHT_QUEUE],
+        BASE          : processedArgs[BASE       ],
+        DELTA         : processedArgs[DELTA      ],
+        STEP          : processedArgs[STEP       ],
+        JITTER        : processedArgs[JITTER     ],
+        SORTED_LAYOUT : sorted(parsedLayout, key=lambda flow: flow[START]),
+        ALL_FLOWS     : sum(entry[FLOWS] for entry in parsedLayout)
     }
 
     metadataPath = os.path.join(processedArgs[DIR], METADATA_NAME)
@@ -604,32 +604,35 @@ def parse_arguments():
 # Entry function
 #
 if __name__ == '__main__':
-    if os.geteuid() == 0:
-        sys.exit("Please, do not run as root. We need to learn your user name.")
-
-    user = getpass.getuser()
-    args = parse_arguments()
-
     try:
-        args   = process_arguments(args)
+        if os.geteuid() == 0:
+            sys.exit("Please, do not run as root. We need to learn your user name.")
 
-        layout = parse_layout(args[LAYOUT_PATH], args[RUNTIME], args[PANTHEON], args[MAX_DELAY])
+        user = getpass.getuser()
+        args = parse_arguments()
 
-    except ArgsError as error:
-        print("Arguments processing failed:\n%s" % error)
-        sys.exit(1)
-    except LayoutError as error:
-        print("Layout parsing failed:\n%s" % error)
-        sys.exit(1)
+        try:
+            args   = process_arguments(args)
+            layout = parse_layout(args[LAYOUT_PATH], args[RUNTIME], args[PANTHEON], args[MAX_DELAY])
 
-    save_metadata(args, layout)
+        except ArgsError as error:
+            print("Arguments processing failed:\n%s" % error)
+            sys.exit(1)
+        except LayoutError as error:
+            print("Layout parsing failed:\n%s" % error)
+            sys.exit(1)
 
-    subprocess.call(['sudo', 'mn', '-c', '--verbosity=output'])
+        save_metadata(args, layout)
 
-    print("Testing:")
+        subprocess.call(['sudo', 'mn', '-c', '--verbosity=output'])
 
-    subprocess.call(['sudo', 'python', 'test1.py', user, args[DIR], args[PANTHEON]])
+        print("Testing:")
 
-    subprocess.call(['sudo', 'mn', '-c', '--verbosity=output'])
+        subprocess.call(['sudo', 'python', 'test1.py', user, args[DIR], args[PANTHEON]])
 
-    print("Done.")
+        subprocess.call(['sudo', 'mn', '-c', '--verbosity=output'])
+
+        print("Done.")
+
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt was caught")
