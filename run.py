@@ -80,7 +80,7 @@ def parse_time_str(timeString, maxDelayUs):
 
 
 #
-# Function saves default layout yaml-file
+# Function saves default layout yaml-file.
 # param [in] layoutPath - path of the layout yaml-file
 # param [in] runtime    - runtime of testing in seconds
 # param [in] rate       - rate in Mbps of the central link of the dumbbell topology
@@ -327,7 +327,7 @@ def load_pantheon_config(pantheonDir):
 
 
 #
-# Function processes time argument
+# Function processes time argument.
 # param [in] argName   - time argument name
 # param [in] timeArg   - time argument value
 # param [in] maxTimeUs - maximum possible input time value in microseconds
@@ -387,7 +387,20 @@ def process_queue_argument(oneQueueArg,  bothQueuesArg):
 
 
 #
-# Function adds arguments to argparse argument parser
+# Function processes the operating system capture buffer size argument.
+# param [in] bufferArg - parsed buffer size argument in MiB passed by user
+# throws ArgsError
+# returns the buffer size in KiB
+#
+def process_buffer_argument(bufferArg):
+    if bufferArg <= 0:
+        raise ArgsError('-b/--buffer must be positive')
+
+    return bufferArg * KIB_IN_MIB
+
+
+#
+# Function adds arguments to argparse argument parser.
 # param [in, out] parser - argparse argument parser
 #
 def add_arguments(parser):
@@ -424,7 +437,7 @@ def add_arguments(parser):
          'The parameter is useful if one wants to reproduce results of testing in which delay '
          'variability feature was used.')
 
-    parser.add_argument('-b', '--buffer', default=2, type=int, choices=xrange(1, 101), metavar='MB',
+    parser.add_argument('-b', '--buffer', default=2, type=int, metavar='MiB',
     help='Set the operating system capture buffer size to chosen number of MiB (1024 KiB), '
          'default is 2 MiB. The value is set as -B option for tcpdump recordings on all hosts.')
 
@@ -447,7 +460,7 @@ class BlankLinesHelpFormatter (argparse.HelpFormatter):
 
 
 #
-# Function generates metadata using processed arguments and parsed layout and saves it to json-file
+# Function generates metadata using processed arguments and parsed layout and saves it to json-file.
 # param [in] processedArgs - processed arguments
 # param [in] parsedLayout  - parsed layout
 #
@@ -562,7 +575,7 @@ def process_arguments(args):
     output[RATE       ] = args.rate
     output[MAX_DELAY  ] = args.max_delay
     output[SEED       ] = args.seed
-    output[BUFFER     ] = args.buffer * KIB_IN_MIB
+    output[BUFFER     ] = process_buffer_argument(args.buffer)
     output[LEFT_QUEUE ] = process_queue_argument (args.left_queue,  args.queues)
     output[RIGHT_QUEUE] = process_queue_argument (args.right_queue, args.queues)
     output[LAYOUT_PATH] = process_layout_argument(args.layout,      output[RUNTIME], output[RATE])
@@ -579,7 +592,7 @@ def process_arguments(args):
 
 
 #
-# Function parses input arguments of the program with argparse parser
+# Function parses input arguments of the program with argparse parser.
 # returns arguments of the program parsed by argparse parser
 #
 def parse_arguments():

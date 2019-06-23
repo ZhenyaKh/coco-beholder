@@ -716,7 +716,7 @@ class Test(object):
 
         if droppedPackets != 0:
             print('WARNING: tcpdump processes dropped %d packets in total. '
-                  'Try to increase -b/--buffer option.' % droppedPackets)
+                  'Please, increase -b/--buffer option.' % droppedPackets)
 
 
 #
