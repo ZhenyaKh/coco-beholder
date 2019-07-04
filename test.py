@@ -21,8 +21,8 @@ USER                = 1
 DIR                 = 2
 PANTHEON            = 3
 METADATA_NAME       = 'metadata.json'
-LEFT_QUEUE          = '_left-queue'
-RIGHT_QUEUE         = '_right-queue'
+FIRST_QUEUE         = '_first-queue'
+SECOND_QUEUE        = '_second-queue'
 SORTED_LAYOUT       = 'sorted-layout'
 BASE                = '_base'
 DELTA               = '_delta'
@@ -40,6 +40,8 @@ LEFT_RATE           = 'left-rate'
 RIGHT_RATE          = 'right-rate'
 LEFT_DELAY          = 'left-delay'
 RIGHT_DELAY         = 'right-delay'
+LEFT_QUEUES         = 'left-queues'
+RIGHT_QUEUES        = 'right-queues'
 DIRECTION           = 'direction'
 START               = 'start'
 RUNS_FIRST          = 'runs-first'
@@ -108,28 +110,30 @@ class Test(object):
         self.pantheon  = pantheon          # full path to Pantheon directory
 
         metadata = self.load_metadata()
-        self.baseUs         = metadata[BASE       ] # initial netem delay at central links
-        self.deltaUs        = metadata[DELTA      ] # time period with which to change netem delay
-        self.stepUs         = metadata[STEP       ] # step to change netem delay at central link
-        self.jitterUs       = metadata[JITTER     ] # netem delay jitter at central link
-        self.seed           = metadata[SEED       ] # randomization seed for delay variability
-        self.bufferKiB      = metadata[BUFFER     ] # capture buffer size set for tcpdump
-        self.runtimeSec     = metadata[RUNTIME    ] # testing runtime
-        self.rateMbps       = metadata[RATE       ] # netem rate at central link
-        self.maxDelayUs     = metadata[MAX_DELAY  ] # max netem delay in us allowed to be set
-        self.leftQueuePkts  = metadata[LEFT_QUEUE ] # size of transmit queue of left router
-        self.rightQueuePkts = metadata[RIGHT_QUEUE] # size of transmit queue of right router
-        self.flows          = metadata[ALL_FLOWS  ] # total number of flows
+        self.baseUs          = metadata[BASE        ] # initial netem delay at central links
+        self.deltaUs         = metadata[DELTA       ] # time period with which to change netem delay
+        self.stepUs          = metadata[STEP        ] # step to change netem delay at central link
+        self.jitterUs        = metadata[JITTER      ] # netem delay jitter at central link
+        self.seed            = metadata[SEED        ] # randomization seed for delay variability
+        self.bufferKiB       = metadata[BUFFER      ] # capture buffer size set for tcpdump
+        self.runtimeSec      = metadata[RUNTIME     ] # testing runtime
+        self.rateMbps        = metadata[RATE        ] # netem rate at central link
+        self.maxDelayUs      = metadata[MAX_DELAY   ] # max netem delay in us allowed to be set
+        self.firstQueuePkts  = metadata[FIRST_QUEUE ] # size of transmit queue of left router
+        self.secondQueuePkts = metadata[SECOND_QUEUE] # size of transmit queue of right router
+        self.flows           = metadata[ALL_FLOWS   ] # total number of flows
 
         layout = self.compute_per_flow_layout(metadata[SORTED_LAYOUT])
-        self.directions     = [ flow[DIRECTION  ] for flow in layout ] # per flow directions
-        self.leftDelaysUs   = [ flow[LEFT_DELAY ] for flow in layout ] # per flow left delays
-        self.rightDelaysUs  = [ flow[RIGHT_DELAY] for flow in layout ] # per flow right delays
-        self.leftRatesMbps  = [ flow[LEFT_RATE  ] for flow in layout ] # per flow left rates
-        self.rightRatesMbps = [ flow[RIGHT_RATE ] for flow in layout ] # per flow right rates
-        self.runsFirst      = [ flow[RUNS_FIRST ] for flow in layout ] # per flow who runs first
-        self.schemes        = [ flow[SCHEME     ] for flow in layout ] # per flow scheme names
-        self.schemePaths    = self.compute_schemes_paths()             # schemes' paths
+        self.directions      = [ flow[DIRECTION   ] for flow in layout ] # per flow directions
+        self.leftDelaysUs    = [ flow[LEFT_DELAY  ] for flow in layout ] # per flow left delays
+        self.rightDelaysUs   = [ flow[RIGHT_DELAY ] for flow in layout ] # per flow right delays
+        self.leftRatesMbps   = [ flow[LEFT_RATE   ] for flow in layout ] # per flow left rates
+        self.rightRatesMbps  = [ flow[RIGHT_RATE  ] for flow in layout ] # per flow right rates
+        self.leftQueuesPkts  = [ flow[LEFT_QUEUES ] for flow in layout ] # per flow left queues
+        self.rightQueuesPkts = [ flow[RIGHT_QUEUES] for flow in layout ] # per flow right queues
+        self.runsFirst       = [ flow[RUNS_FIRST  ] for flow in layout ] # per flow who runs first
+        self.schemes         = [ flow[SCHEME      ] for flow in layout ] # per flow scheme names
+        self.schemePaths     = self.compute_schemes_paths()              # schemes' paths
 
         self.network            = None # Mininet network
         self.leftRouter         = None # router interconnecting left hosts
@@ -402,8 +406,7 @@ class Test(object):
     # Method sets rates, (base) delays and queue sizes at the topology's interfaces
     #
     def setup_interfaces_qdisc(self):
-        # setting netem for the central link of the dumbbell topology
-
+        # setting netem for the central link of the dumbbell topology:
         netemCmd = \
             'tc qdisc replace dev {0} root netem delay %dus {1:d}us rate {2:f}Mbit limit {3:d}'
 
@@ -411,30 +414,33 @@ class Test(object):
         rightIntf = self.rightRouter.intfs[self.flows]
 
         self.leftNetemCmd  = netemCmd.format(leftIntf,
-                                             self.jitterUs, self.rateMbps, self.leftQueuePkts)
+                                             self.jitterUs, self.rateMbps, self.firstQueuePkts)
 
         self.rightNetemCmd = netemCmd.format(rightIntf,
-                                             self.jitterUs, self.rateMbps, self.rightQueuePkts)
+                                             self.jitterUs, self.rateMbps, self.secondQueuePkts)
 
         self.leftRouter. cmd(self.leftNetemCmd  % self.delaysArrayUs[0])
         self.rightRouter.cmd(self.rightNetemCmd % self.delaysArrayUs[0])
 
-        # setting netem for all the links in the left and right halves of the dumbbell topology
-
-        netemCmd = 'tc qdisc replace dev %s root netem delay %dus rate %fMbit limit %d'
+        # setting netem for all the links in the left and right halves of the dumbbell topology:
+        netemCmd  = 'tc qdisc replace dev %s root netem delay %dus rate %fMbit limit %d'
+        bridgeCmd = 'tc qdisc replace dev %s-%s root netem limit %d'
 
         for i in range(0, self.flows):
             self.leftRouter.   cmd(netemCmd % (self.leftRouter.intfs[i],  self.leftDelaysUs[i],
-                                               self.leftRatesMbps[i],     DEFAULT_QUEUE_SIZE))
+                                               self.leftRatesMbps[i],     self.leftQueuesPkts[i]))
 
             self.leftHosts[i]. cmd(netemCmd % (self.leftHosts[i].intf(),  self.leftDelaysUs[i],
-                                               self.leftRatesMbps[i],     DEFAULT_QUEUE_SIZE))
+                                               self.leftRatesMbps[i],     self.leftQueuesPkts[i]))
 
             self.rightRouter.  cmd(netemCmd % (self.rightRouter.intfs[i], self.rightDelaysUs[i],
-                                               self.rightRatesMbps[i],    DEFAULT_QUEUE_SIZE))
+                                               self.rightRatesMbps[i],    self.rightQueuesPkts[i]))
 
             self.rightHosts[i].cmd(netemCmd % (self.rightHosts[i].intf(), self.rightDelaysUs[i],
-                                               self.rightRatesMbps[i],    DEFAULT_QUEUE_SIZE))
+                                               self.rightRatesMbps[i],    self.rightQueuesPkts[i]))
+
+            self.leftHosts[i]. cmd(bridgeCmd % (self.leftHosts[i],  BRIDGE, DEFAULT_QUEUE_SIZE))
+            self.rightHosts[i].cmd(bridgeCmd % (self.rightHosts[i], BRIDGE, DEFAULT_QUEUE_SIZE))
 
 
     #
@@ -763,7 +769,7 @@ if __name__ == '__main__':
     try:
         test = Test(user, dir, pantheon)
         test.test()
-        #CLI(test.network)
+        CLI(test.network)
     except MetadataError as error:
         print("Metadata error:\n%s" % error)
         exitCode = EXIT_FAILURE

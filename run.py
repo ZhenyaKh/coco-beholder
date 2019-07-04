@@ -11,8 +11,8 @@ import time
 
 DIR                  = 'dir'
 PANTHEON             = 'pantheon'
-LEFT_QUEUE           = '_left-queue'
-RIGHT_QUEUE          = '_right-queue'
+FIRST_QUEUE          = '_first-queue'
+SECOND_QUEUE         = '_second-queue'
 DEFAULT_LAYOUT_PATH  = 'layout.yml'
 LAYOUT_PATH          = 'layout-path'
 SORTED_LAYOUT        = 'sorted-layout'
@@ -39,6 +39,8 @@ LEFT_RATE            = 'left-rate'
 RIGHT_RATE           = 'right-rate'
 LEFT_DELAY           = 'left-delay'
 RIGHT_DELAY          = 'right-delay'
+LEFT_QUEUES          = 'left-queues'
+RIGHT_QUEUES         = 'right-queues'
 SENDER               = 'sender'
 RECEIVER             = 'receiver'
 WRAPPERS_PATH        = 'src/wrappers'
@@ -86,33 +88,39 @@ def parse_time_str(timeString, maxDelayUs):
 # param [in] rate       - rate in Mbps of the central link of the dumbbell topology
 #
 def save_default_layout(layoutPath, runtime, rate):
-    layout = [{ SCHEME      : 'cubic',
-                FLOWS       : 1,
-                START       : 0,
-                DIRECTION   : LEFTWARD,
-                LEFT_RATE   : None,
-                RIGHT_RATE  : None,
-                LEFT_DELAY  : None,
-                RIGHT_DELAY : None },
+    layout = [{ SCHEME       : 'cubic',
+                FLOWS        : 1,
+                START        : 0,
+                DIRECTION    : LEFTWARD,
+                LEFT_RATE    : None,
+                RIGHT_RATE   : None,
+                LEFT_DELAY   : None,
+                RIGHT_DELAY  : None,
+                LEFT_QUEUES  : None,
+                RIGHT_QUEUES : None },
 
-              { SCHEME      : 'vegas',
-                FLOWS       : 2,
-                START       : runtime / 2,
-                DIRECTION   : RIGHTWARD,
-                LEFT_RATE   : rate,
-                RIGHT_RATE  : int(rate),
-                LEFT_DELAY  : '0us',
-                RIGHT_DELAY : '5ms' },
+              { SCHEME       : 'vegas',
+                FLOWS        : 2,
+                START        : runtime / 2,
+                DIRECTION    : RIGHTWARD,
+                LEFT_RATE    : rate,
+                RIGHT_RATE   : int(rate),
+                LEFT_DELAY   : '0us',
+                LEFT_QUEUES  : DEFAULT_QUEUE_SIZE * 2,
+                RIGHT_QUEUES : DEFAULT_QUEUE_SIZE * 3,
+                RIGHT_DELAY  : '5ms' },
 
-              { SCHEME      : 'cubic',
-                FLOWS       : 1,
-                START       : 0,
-                DIRECTION   : RIGHTWARD
+              { SCHEME       : 'cubic',
+                FLOWS        : 1,
+                START        : 0,
+                DIRECTION    : RIGHTWARD
               }]
 
     with open(layoutPath, 'w') as yamlFile:
         yamlFile.write("# Delays/rates are optional: if lacking or null, they are set to 0us/0.0\n"
-                       "# and for netem, to set delay/rate to zero is same as to leave it unset.\n")
+                       "# and for netem, to set delay/rate to zero is same as to leave it unset.\n"
+                       "# Sizes of queues are optional: if lacking or null, they are set to %d.\n"
+                       % DEFAULT_QUEUE_SIZE)
 
         yaml.dump(layout, yamlFile, default_flow_style=False)
 
@@ -123,13 +131,13 @@ def save_default_layout(layoutPath, runtime, rate):
 # param [in, out] parser - argparse argument parser
 #
 def add_queue_arguemnts(parser):
-    parser.add_argument('-q1', '--left-queue', type=int, metavar='SIZE',
-    help='Size of transmit queue of the left router\'s interface at the end of the central link of '
-         'the dumbbell topology, default is %d packets' % DEFAULT_QUEUE_SIZE)
+    parser.add_argument('-q1', '--first-queue', type=int, metavar='SIZE',
+    help='Size of transmit queue of the left router\'s interface at the first end of the central '
+         'link of the dumbbell topology, default is %d packets' % DEFAULT_QUEUE_SIZE)
 
-    parser.add_argument('-q2', '--right-queue', type=int, metavar='SIZE',
-    help='Size of transmit queue of the right router\'s interface at the end of the central link '
-         'of the dumbbell topology, default is %d packets' % DEFAULT_QUEUE_SIZE)
+    parser.add_argument('-q2', '--second-queue', type=int, metavar='SIZE',
+    help='Size of transmit queue of the right router\'s interface at the second end of the central '
+         'link of the dumbbell topology, default is %d packets' % DEFAULT_QUEUE_SIZE)
 
     parser.add_argument('-q', '--queues', type=int, metavar='SIZE',
     help='Common size of transmit queues of both the interfaces at the ends of the central link of '
@@ -159,6 +167,28 @@ def add_delay_arguments(parser):
     parser.add_argument('jitter', action="store", nargs='?',
     help='Jitter affecting the delay at both ends of the central link in the formats: N '
          '(milliseconds assumed), Nus, Nms, Ns. The argument is optional.')
+
+
+#
+# Function parses queues-size of the left/right half of the dumbbell topology for flows of the item.
+# param [in] item    - layout item
+# param [in] index   - index of the layout item
+# param [in] itemKey - key name of the item: "left-queues" or "right-queues"
+# throws LayoutError
+# returns queues-size in packets of the half of the dumbbell topology for the flows of the item
+#
+def parse_flows_queues(item, index, itemKey):
+    queuesSize = item.get(itemKey)
+
+    if queuesSize is None:
+        queuesSize = DEFAULT_QUEUE_SIZE
+    else:
+        if not isinstance(queuesSize, int):
+            raise LayoutError('%s in item #%d is "%s" but if present it should be integer, ' \
+                              'measured in number of packets' % (itemKey, index, queuesSize))
+        queuesSize = int(queuesSize)
+
+    return queuesSize
 
 
 #
@@ -374,7 +404,7 @@ def process_layout_argument(layoutArg, runtime, rate):
 #
 def process_queue_argument(oneQueueArg,  bothQueuesArg):
     if bothQueuesArg is not None and oneQueueArg is not None:
-        raise ArgsError('--queues cannot be used together with --left-queue or --right-queue')
+        raise ArgsError('--queues cannot be used together with --first-queue or --second-queue')
 
     if oneQueueArg is not None:
         queueSize = oneQueueArg
@@ -467,17 +497,17 @@ class BlankLinesHelpFormatter (argparse.HelpFormatter):
 def save_metadata(processedArgs, parsedLayout):
     metadata =\
     {
-        RATE          : processedArgs[RATE       ],
-        RUNTIME       : processedArgs[RUNTIME    ],
-        MAX_DELAY     : processedArgs[MAX_DELAY  ],
-        SEED          : processedArgs[SEED       ],
-        BUFFER        : processedArgs[BUFFER     ],
-        LEFT_QUEUE    : processedArgs[LEFT_QUEUE ],
-        RIGHT_QUEUE   : processedArgs[RIGHT_QUEUE],
-        BASE          : processedArgs[BASE       ],
-        DELTA         : processedArgs[DELTA      ],
-        STEP          : processedArgs[STEP       ],
-        JITTER        : processedArgs[JITTER     ],
+        RATE          : processedArgs[RATE        ],
+        RUNTIME       : processedArgs[RUNTIME     ],
+        MAX_DELAY     : processedArgs[MAX_DELAY   ],
+        SEED          : processedArgs[SEED        ],
+        BUFFER        : processedArgs[BUFFER      ],
+        FIRST_QUEUE   : processedArgs[FIRST_QUEUE ],
+        SECOND_QUEUE  : processedArgs[SECOND_QUEUE],
+        BASE          : processedArgs[BASE        ],
+        DELTA         : processedArgs[DELTA       ],
+        STEP          : processedArgs[STEP        ],
+        JITTER        : processedArgs[JITTER      ],
         SORTED_LAYOUT : sorted(parsedLayout, key=lambda flow: flow[START]),
         ALL_FLOWS     : sum(entry[FLOWS] for entry in parsedLayout)
     }
@@ -525,23 +555,24 @@ def parse_layout(layoutPath, runtime, pantheonDir, maxDelay):
 
         entry = { }
 
-        entry[SCHEME     ] = parse_item_scheme      (item, index, allSchemes)
+        entry[SCHEME      ] = parse_item_scheme      (item, index, allSchemes)
 
-        entry[RUNS_FIRST ] = who_runs_first         (entry[SCHEME], pantheonDir)
+        entry[RUNS_FIRST  ] = who_runs_first         (entry[SCHEME], pantheonDir)
 
-        entry[FLOWS      ] = parse_item_flows_number(item, index)
+        entry[FLOWS       ] = parse_item_flows_number(item, index)
 
-        entry[START      ] = parse_item_flows_start (item, index, runtime)
+        entry[START       ] = parse_item_flows_start (item, index, runtime)
 
-        entry[DIRECTION  ] = parse_flows_direction  (item, index)
+        entry[DIRECTION   ] = parse_flows_direction  (item, index)
 
-        entry[LEFT_RATE  ] = parse_flows_rate       (item, index, LEFT_RATE)
+        entry[LEFT_RATE   ] = parse_flows_rate       (item, index, LEFT_RATE)
+        entry[RIGHT_RATE  ] = parse_flows_rate       (item, index, RIGHT_RATE)
 
-        entry[RIGHT_RATE ] = parse_flows_rate       (item, index, RIGHT_RATE)
+        entry[LEFT_DELAY  ] = parse_flows_delay      (item, index, maxDelay, LEFT_DELAY)
+        entry[RIGHT_DELAY ] = parse_flows_delay      (item, index, maxDelay, RIGHT_DELAY)
 
-        entry[LEFT_DELAY ] = parse_flows_delay      (item, index, maxDelay, LEFT_DELAY)
-
-        entry[RIGHT_DELAY] = parse_flows_delay      (item, index, maxDelay, RIGHT_DELAY)
+        entry[LEFT_QUEUES ] = parse_flows_queues     (item, index, LEFT_QUEUES)
+        entry[RIGHT_QUEUES] = parse_flows_queues     (item, index, RIGHT_QUEUES)
 
         layout.append(entry)
 
@@ -572,13 +603,13 @@ def process_arguments(args):
     if not os.path.exists(output[PANTHEON]):
         raise ArgsError('Pantheon directory %s does not exist' % output[PANTHEON])
 
-    output[RATE       ] = args.rate
-    output[MAX_DELAY  ] = args.max_delay
-    output[SEED       ] = args.seed
-    output[BUFFER     ] = process_buffer_argument(args.buffer)
-    output[LEFT_QUEUE ] = process_queue_argument (args.left_queue,  args.queues)
-    output[RIGHT_QUEUE] = process_queue_argument (args.right_queue, args.queues)
-    output[LAYOUT_PATH] = process_layout_argument(args.layout,      output[RUNTIME], output[RATE])
+    output[RATE        ] = args.rate
+    output[MAX_DELAY   ] = args.max_delay
+    output[SEED        ] = args.seed
+    output[BUFFER      ] = process_buffer_argument(args.buffer)
+    output[FIRST_QUEUE ] = process_queue_argument (args.first_queue,  args.queues)
+    output[SECOND_QUEUE] = process_queue_argument (args.second_queue, args.queues)
+    output[LAYOUT_PATH ] = process_layout_argument(args.layout,       output[RUNTIME], output[RATE])
 
     output[BASE  ] = process_time_arg(BASE,   args.base,   output[MAX_DELAY])
     output[DELTA ] = process_time_arg(DELTA,  args.delta,  output[MAX_DELAY])
@@ -606,13 +637,13 @@ def parse_arguments():
     'central link between the two routers. User can define how many flows of which schemes should '
     'be run by defining groups of flows. A group of flows is defined by a scheme name, number of '
     'flows, a second of runtime at which the group of flows should be started, direction of the '
-    'flows: left-to-right or right-to-left, rate and delay of the links belonging to the flows in '
-    'the left half of the topology, rate and delay or the links belonging to the flows in the '
-    'right half of the topology. For the central link, user can define its rate, constant or '
-    'VARIABLE DELAY with optional jitter, sizes of transmit queues of the routers at the ends of '
-    'the central link. Qdisc netem is applied to interfaces of links to set rates, delays and '
-    'queue sizes of the links. For each link, the specified rate/delay/queue parameters are always '
-    'installed at both ends of the link.')
+    'flows: left-to-right or right-to-left, rate/delay/queue-size of the links belonging to '
+    'the flows in the left half of the topology, rate/delay/queue-size of the links '
+    'belonging to the flows in the right half of the topology. For the central link, user can '
+    'define its rate, constant or VARIABLE DELAY with optional jitter, individual queue-size for '
+    'each end of the central link. Qdisc netem is applied to interfaces of links to '
+    'set rates, delays and queue-sizes of the links. For each link, the specified '
+    'rate/delay/queue-size parameters are always installed at both ends of the link.')
 
     add_arguments(parser)
 
