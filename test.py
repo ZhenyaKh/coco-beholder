@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import sys
 import os
@@ -67,13 +67,7 @@ RIGHTWARD           = '->'
 PORT                = 50000
 SECOND              = 1.0
 TIMEOUT_SEC         = 5.0
-
-
-#
-# Custom Exception class for errors connected to actual testing
-#
-class TestError(Exception):
-    pass
+BRIDGE              = 'br0'
 
 
 #
@@ -164,17 +158,15 @@ class Test(object):
 
     #
     # Method runs actual testing
-    # throws TestError
     #
     def test(self):
         try:
-            random.seed(self.seed)
             print("Total number of flows is %d" % self.flows)
             print("Flows have been sorted by their start")
 
             print("Creating the dumbbell topology...")
             self.build_dumbbell_network()
-            print("Setting schemes up after reboot...")
+            print("Calling setup_after_reboot on wrappers of the schemes...")
             self.setup_schemes_after_reboot()
             print("Setting rates, delays and queue sizes at the topology's interfaces...")
             self.setup_interfaces_qdisc()
@@ -292,6 +284,7 @@ class Test(object):
         if delayUs + self.stepUs > self.maxDelayUs and delayUs - self.stepUs < 0:
             raise MetadataError("Schedule of delay's changes for the central link of the dumbbell "
                                 "topology cannot be generated because step is too big")
+        random.seed(self.seed)
 
         for _ in deltasSecArray[1:]:
             signs = []
@@ -395,11 +388,14 @@ class Test(object):
     # Method makes setup after reboot for each scheme
     #
     def setup_schemes_after_reboot(self):
-        for schemePath in self.schemePaths.values():
-            try:
-                subprocess.check_call([schemePath, 'setup_after_reboot'], stdout=PIPE, stderr=PIPE)
-            except subprocess.CalledProcessError as error:
-                raise TestError(error)
+        for scheme, schemePath in self.schemePaths.iteritems():
+            popen = subprocess.Popen([schemePath, 'setup_after_reboot'], stdout=PIPE, stderr=PIPE)
+
+            output, error = popen.communicate()
+
+            if popen.returncode != 0:
+                print('WARNING: For %s, setup_after_reboot exited with code %d and message:\n%s' %
+                     (scheme, popen.returncode, error))
 
 
     #
@@ -453,11 +449,11 @@ class Test(object):
                 receiverHost = self.rightHosts[i]
                 senderHost   = self.leftHosts[i]
 
-            receiverIntf     = receiverHost.intf()
-            senderIntf       = senderHost.  intf()
+            receiverIntf     = "%s-%s" % (receiverHost, BRIDGE)
+            senderIntf       = "%s-%s" % (senderHost,   BRIDGE)
 
-            receiverIp       = receiverIntf.IP()
-            senderIp         = senderIntf.  IP()
+            receiverIp       = receiverHost.IP()
+            senderIp         = senderHost.  IP()
 
             receiverDumpName = "%d-%s-%s.pcap" % (i + 1, self.schemes[i], RECEIVER)
             senderDumpName   = "%d-%s-%s.pcap" % (i + 1, self.schemes[i], SENDER)
@@ -656,33 +652,35 @@ class Test(object):
         ipPools = [None] * self.flows
 
         router = self.network.addHost(routerName)
-        router.cmd('sysctl net.ipv4.ip_forward=1')
+        router.cmd('sysctl -w net.ipv4.ip_forward=1')
         router.cmd('ifconfig lo up')
+        self.turn_off_ipv6(router)
 
         for i in range(0, self.flows):
-            # creating new host and connecting it to one of router interfaces
             hosts[i] = self.network.addHost('%s%d' % (hostsLiteral, (i + 1)))
             hosts[i].cmd('ifconfig lo up')
+            self.turn_off_ipv6(hosts[i])
+
+            # connecting the new host to one of the router interfaces
             self.network.addLink(hosts[i], router)
 
-            # getting two ip addresses for router interface and host interface
+            # getting two IPs with mask for the router interface and for the host interface
             subnet     = freeSubnets.next()
             ipPools[i] = ['%s/%d' % (host, subnet.prefixlen) for host in list(subnet.hosts())]
 
-            # assigning the two ip addresses to the router interface and host interface
-            router.setIP(ipPools[i][1], intf=router.intfs[i])
+            # assigning IPs with mask to the router interface and to the host interface
+            router.  setIP(ipPools[i][1], intf=router.intfs[i])
             hosts[i].setIP(ipPools[i][0])
 
             # turning off TCP segmentation offload and UDP fragmentation offload!
             router.  cmd('ethtool -K %s tx off sg off tso off ufo off' % router.intfs[i])
             hosts[i].cmd('ethtool -K %s tx off sg off tso off ufo off' % hosts[i].intf())
 
-            # setting arp entries for the entire subnet
+            self.setup_bridge(hosts[i], ipPools[i][0], router.intfs[i].IP())
+
+            # setting arp entries for the entire subnet -- only after setting up the bridge!
             router.  cmd('arp', '-s', hosts[i].intf().IP(), hosts[i].intf().MAC())
             hosts[i].cmd('arp', '-s', router.intfs[i].IP(), router.intfs[i].MAC())
-
-            # setting the router as the default gateway for the host
-            hosts[i].setDefaultRoute('via %s' % router.intfs[i].IP())
 
         return hosts, router
 
@@ -719,6 +717,40 @@ class Test(object):
                   'Please, increase -b/--buffer option.' % droppedPackets)
 
 
+    #
+    # Method turns off IPv6 support at the node
+    # param [in] node - node at which ipv6 should be turned off
+    #
+    def turn_off_ipv6(self, node):
+        node.cmd('sysctl -w net.ipv6.conf.all.disable_ipv6=1')
+        node.cmd('sysctl -w net.ipv6.conf.default.disable_ipv6 = 1')
+        node.cmd('sysctl -w net.ipv6.conf.lo.disable_ipv6 = 1')
+
+
+    #
+    # Method sets up Linux bridge at the host
+    # param [in] hostIp    - IP with mask of host at which Linux bridge should be set up
+    # param [in] gatewayIP - IP without mask of gateway for the host
+    #
+    def setup_bridge(self, host, hostIp, gatewayIP):
+        bridge = "%s-%s" % (host, BRIDGE)
+
+        # adding the bridge interface
+        host.cmd('ip link add name %s type bridge'             % bridge)
+        # attaching the main host interface to the bridge interface
+        host.cmd('ip link set %s master %s'                    % (host.intf(), bridge))
+        # setting the bridge interface up
+        host.cmd('ip link set dev %s up'                       % bridge)
+        # assigning the ip address to the host bridge interface
+        host.cmd('ip addr add dev %s %s'                       % (bridge, hostIp))
+        # setting the peer interface of the router as the gateway
+        host.cmd('route add default gw %s dev %s'              % (gatewayIP, bridge))
+        # zero out ip of the main host interface to remove the interface from route and arp tables
+        host.cmd('ifconfig %s 0.0.0.0 up'                      % host.intf())
+        # turning off TCP segmentation offload and UDP fragmentation offload!
+        host.cmd('ethtool -K %s tx off sg off tso off ufo off' % bridge)
+
+
 #
 # Entry function
 #
@@ -731,12 +763,9 @@ if __name__ == '__main__':
     try:
         test = Test(user, dir, pantheon)
         test.test()
-        CLI(test.network)
+        #CLI(test.network)
     except MetadataError as error:
         print("Metadata error:\n%s" % error)
-        exitCode = EXIT_FAILURE
-    except TestError as error:
-        print("Testing error:\n%s"  % error)
         exitCode = EXIT_FAILURE
     except KeyboardInterrupt:
         sys.exit(EXIT_FAILURE)
