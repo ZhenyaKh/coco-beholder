@@ -139,7 +139,7 @@ class Node( object ):
         # bash -i: force interactive
         # -s: pass $* to shell, and make process easy to find in ps
         # prompt is set to sentinel chr( 127 )
-        cmd = [ 'lib/mininet/mnexec', opts, 'env', 'PS1=' + chr( 127 ),
+        cmd = [ 'mnexec', opts, 'env', 'PS1=' + chr( 127 ),
                 'bash', '--norc', '--noediting',
                 '-is', 'mininet:' + self.name ]
 
