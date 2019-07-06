@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
+import sys
+import time
 import os
 import getpass
 import argparse
-import yaml
-import sys
 import subprocess
 import json
-import time
+
+import yaml
 
 DIR                  = 'dir'
 PANTHEON             = 'pantheon'
@@ -24,7 +25,7 @@ RATE                 = '_rate'
 MAX_DELAY            = '_max-delay'
 SEED                 = '_seed'
 BUFFER               = '_buffer'
-PANTHEON_CONFIG_PATH = 'src/config.yml'
+PANTHEON_CONFIG_PATH = os.path.join('src', 'config.yml')
 SCHEMES              = 'schemes'
 FLOWS                = 'flows'
 ALL_FLOWS            = '_all-flows'
@@ -43,7 +44,7 @@ LEFT_QUEUES          = 'left-queues'
 RIGHT_QUEUES         = 'right-queues'
 SENDER               = 'sender'
 RECEIVER             = 'receiver'
-WRAPPERS_PATH        = 'src/wrappers'
+WRAPPERS_PATH        = os.path.join('src', 'wrappers')
 RUNS_FIRST           = 'runs-first'
 DEFAULT_QUEUE_SIZE   = 1000
 KIB_IN_MIB           = 1024
@@ -335,7 +336,7 @@ def parse_item_scheme(item, index, allSchemes):
 #
 def load_layout_file(layoutPath):
     try:
-        return yaml.load(open(layoutPath, 'r'))
+        return yaml.full_load(open(layoutPath, 'r'))
     except Exception as error:
         raise LayoutError("Failed to load layout yaml-file:\n%s" % error)
 
@@ -351,7 +352,7 @@ def load_pantheon_config(pantheonDir):
 
     try:
         with open(pantheonPath) as pantheonConfig:
-            return yaml.load(pantheonConfig)[SCHEMES].keys()
+            return yaml.full_load(pantheonConfig)[SCHEMES].keys()
     except Exception as error:
         raise LayoutError("Failed to load Pantheon configuration file:\n%s" % error)
 
@@ -658,7 +659,7 @@ def parse_arguments():
 if __name__ == '__main__':
     try:
         if os.geteuid() == 0:
-            sys.exit("Please, do not run as root. We need to learn your user name.")
+            sys.exit("Please, do not run as root. I need to learn your user name.")
 
         user = getpass.getuser()
         args = parse_arguments()
@@ -676,13 +677,9 @@ if __name__ == '__main__':
 
         save_metadata(args, layout)
 
-        subprocess.call(['sudo', 'mn', '-c', '--verbosity=output'])
-
         print("Testing:")
 
         subprocess.call(['sudo', 'python', 'test.py', user, args[DIR], args[PANTHEON]])
-
-        subprocess.call(['sudo', 'mn', '-c', '--verbosity=output'])
 
         print("Done.")
 

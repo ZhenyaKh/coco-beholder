@@ -1,21 +1,23 @@
 #!/usr/bin/env python
 
 import sys
-import os
-import json
-import random
-import ipaddress
-import subprocess
-from subprocess import PIPE
 from time import sleep
 import time
 import signal
+import os
+import json
+import random
+import subprocess
+from subprocess import PIPE
 import threading
 from multiprocessing import Pool, cpu_count
 import re
 
-from mininet.net import Mininet
-from mininet.net import CLI
+import ipaddress
+
+from lib.mininet.moduledeps import pathCheck
+from lib.mininet.net import Mininet
+from lib.mininet.net import CLI
 
 USER                = 1
 DIR                 = 2
@@ -45,7 +47,7 @@ RIGHT_QUEUES        = 'right-queues'
 DIRECTION           = 'direction'
 START               = 'start'
 RUNS_FIRST          = 'runs-first'
-WRAPPERS_PATH       = 'src/wrappers'
+WRAPPERS_PATH       = os.path.join('src', 'wrappers')
 SENDER              = 'sender'
 RECEIVER            = 'receiver'
 SUPERNET_SIZE       = 16
@@ -538,7 +540,7 @@ class Test(object):
 
 
     #
-    # Method starts clients for each flow
+    # Method starts clients for each flow -- should be run in a separate thread
     #
     def start_clients(self):
         benchmarkStart = timeStart = time.time() # TODO: remove benchmark
@@ -766,6 +768,8 @@ if __name__ == '__main__':
     pantheon = sys.argv[PANTHEON]
     exitCode = EXIT_SUCCESS
 
+    pathCheck('ifconfig', 'ethtool', 'tc', 'tcpdump', 'lsof', 'sysctl', 'arp', 'route', 'ip')
+
     try:
         test = Test(user, dir, pantheon)
         test.test()
@@ -774,7 +778,8 @@ if __name__ == '__main__':
         print("Metadata error:\n%s" % error)
         exitCode = EXIT_FAILURE
     except KeyboardInterrupt:
-        sys.exit(EXIT_FAILURE)
+        print("KeyboardInterrupt was caught")
+        exitCode = EXIT_FAILURE
 
     exitMessage = SUCCESS_MESSAGE if exitCode == EXIT_SUCCESS else FAILURE_MESSAGE
     print(exitMessage)
