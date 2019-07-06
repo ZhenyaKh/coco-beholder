@@ -72,6 +72,9 @@ PORT                = 50000
 SECOND              = 1.0
 TIMEOUT_SEC         = 5.0
 BRIDGE              = 'br0'
+PATH                = 'PATH'
+MININET             = os.path.join(os.getcwd(), 'lib', 'mininet')
+MNEXE               = os.path.join(MININET, 'mnexec')
 
 
 #
@@ -768,7 +771,8 @@ if __name__ == '__main__':
     pantheon = sys.argv[PANTHEON]
     exitCode = EXIT_SUCCESS
 
-    pathCheck('ifconfig', 'ethtool', 'tc', 'tcpdump', 'lsof', 'sysctl', 'arp', 'route', 'ip')
+    os.environ[PATH] = MININET + os.pathsep + os.environ[PATH]
+    pathCheck(MNEXE, 'ifconfig', 'ethtool', 'tc', 'tcpdump', 'lsof', 'sysctl', 'arp', 'route', 'ip')
 
     try:
         test = Test(user, dir, pantheon)

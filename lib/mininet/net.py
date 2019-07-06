@@ -107,9 +107,6 @@ from lib.mininet.util import ( quietRun, fixLimits, numCores, ensureRoot,
                            waitListening, BaseString )
 from lib.mininet.term import cleanUpScreens, makeTerms
 
-# Changing path to local mnexec executable
-os.environ['PATH'] = os.path.join(os.getcwd(), 'lib', 'mininet') + os.pathsep + os.environ['PATH']
-
 # Mininet version: should be consistent with README and LICENSE
 VERSION = "2.3.0d5"
 
