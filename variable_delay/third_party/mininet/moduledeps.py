@@ -1,7 +1,7 @@
 "Module dependency utility functions for Mininet."
 
-from lib.mininet.util import quietRun, BaseString
-from lib.mininet.log import info, error, debug
+from variable_delay.third_party.mininet.util import quietRun, BaseString
+from variable_delay.third_party.mininet.log import info, error, debug
 from os import environ
 
 def lsmod():

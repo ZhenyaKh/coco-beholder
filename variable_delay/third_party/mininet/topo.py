@@ -11,7 +11,7 @@ A Topo object can be a topology database for NOX, can represent a physical
 setup for testing, and can even be emulated with the Mininet package.
 """
 
-from lib.mininet.util import irange, natural, naturalSeq
+from variable_delay.third_party.mininet.util import irange, natural, naturalSeq
 
 class MultiGraph( object ):
     "Utility class to track nodes and edges - replaces networkx.MultiGraph"

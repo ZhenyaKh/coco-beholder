@@ -66,7 +66,7 @@ Note also that 10.0.0.1 can often be written as 10.1 for short, e.g.
 
 Currently we wrap the entire network in a 'mininet' object, which
 constructs a simulated network based on a network topology created
-using a topology object (e.g. LinearTopo) from lib.mininet.topo or
+using a topology object (e.g. LinearTopo) from variable_delay.third_party.mininet.topo or
 mininet.topolib, and a Controller which the switches will connect
 to. Several configuration options are provided for functions such as
 automatically setting MAC addresses, populating the ARP table, or
@@ -96,16 +96,22 @@ from time import sleep
 from itertools import chain, groupby
 from math import ceil
 
-from lib.mininet.cli import CLI
-from lib.mininet.log import info, error, debug, output, warn
-from lib.mininet.node import ( Node, Host, OVSKernelSwitch, DefaultController,
+from variable_delay.third_party.mininet.cli import CLI
+from variable_delay.third_party.mininet.log import info, error, debug, output, warn
+from variable_delay.third_party.mininet.node import ( Node, Host, OVSKernelSwitch, DefaultController,
                            Controller )
-from lib.mininet.nodelib import NAT
-from lib.mininet.link import Link, Intf
-from lib.mininet.util import ( quietRun, fixLimits, numCores, ensureRoot,
+from variable_delay.third_party.mininet.nodelib import NAT
+from variable_delay.third_party.mininet.link import Link, Intf
+from variable_delay.third_party.mininet.util import ( quietRun, fixLimits, numCores, ensureRoot,
                            macColonHex, ipStr, ipParse, netParse, ipAdd,
                            waitListening, BaseString )
-from lib.mininet.term import cleanUpScreens, makeTerms
+from variable_delay.third_party.mininet.term import cleanUpScreens, makeTerms
+
+from variable_delay.third_party.mininet.moduledeps import pathCheck
+
+MININET = os.path.join('variable_delay', 'third_party', 'mininet')
+os.environ['PATH'] = MININET + os.pathsep + os.environ['PATH']
+pathCheck(os.path.join(MININET, 'mnexec'))
 
 # Mininet version: should be consistent with README and LICENSE
 VERSION = "2.3.0d5"

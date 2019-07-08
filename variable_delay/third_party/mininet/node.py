@@ -60,12 +60,12 @@ import select
 from subprocess import Popen, PIPE
 from time import sleep
 
-from lib.mininet.log import info, error, warn, debug
-from lib.mininet.util import ( quietRun, errRun, errFail, moveIntf, isShellBuiltin,
+from variable_delay.third_party.mininet.log import info, error, warn, debug
+from variable_delay.third_party.mininet.util import ( quietRun, errRun, errFail, moveIntf, isShellBuiltin,
                            numCores, retry, mountCgroups, BaseString, decode,
                            encode, Python3, which )
-from lib.mininet.moduledeps import moduleDeps, pathCheck, TUN
-from lib.mininet.link import Link, Intf, TCIntf, OVSIntf
+from variable_delay.third_party.mininet.moduledeps import moduleDeps, pathCheck, TUN
+from variable_delay.third_party.mininet.link import Link, Intf, TCIntf, OVSIntf
 from re import findall
 from distutils.version import StrictVersion
 

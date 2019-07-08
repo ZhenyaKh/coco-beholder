@@ -4,10 +4,10 @@ Node Library for Mininet
 This contains additional Node types which you may find to be useful.
 """
 
-from lib.mininet.node import Node, Switch
-from lib.mininet.log import info, warn
-from lib.mininet.moduledeps import pathCheck
-from lib.mininet.util import quietRun
+from variable_delay.third_party.mininet.node import Node, Switch
+from variable_delay.third_party.mininet.log import info, warn
+from variable_delay.third_party.mininet.moduledeps import pathCheck
+from variable_delay.third_party.mininet.util import quietRun
 
 
 class LinuxBridge( Switch ):

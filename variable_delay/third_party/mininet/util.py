@@ -1,7 +1,7 @@
 "Utility functions for Mininet."
 
 
-from lib.mininet.log import output, info, error, warn, debug
+from variable_delay.third_party.mininet.log import output, info, error, warn, debug
 
 from time import sleep
 from resource import getrlimit, setrlimit, RLIMIT_NPROC, RLIMIT_NOFILE

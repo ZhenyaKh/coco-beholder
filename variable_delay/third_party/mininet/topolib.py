@@ -1,7 +1,7 @@
 "Library of potentially useful topologies for Mininet"
 
-from lib.mininet.topo import Topo
-from lib.mininet.net import Mininet
+from variable_delay.third_party.mininet.topo import Topo
+from variable_delay.third_party.mininet.net import Mininet
 
 # The build() method is expected to do this:
 # pylint: disable=arguments-differ

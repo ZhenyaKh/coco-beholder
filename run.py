@@ -3,12 +3,14 @@
 import sys
 import time
 import os
-import getpass
 import argparse
 import subprocess
 import json
+import pwd
 
 import yaml
+
+from variable_delay.src import test
 
 DIR                  = 'dir'
 PANTHEON             = 'pantheon'
@@ -48,6 +50,8 @@ WRAPPERS_PATH        = os.path.join('src', 'wrappers')
 RUNS_FIRST           = 'runs-first'
 DEFAULT_QUEUE_SIZE   = 1000
 KIB_IN_MIB           = 1024
+SUDO_USER            = 'SUDO_USER'
+UTF8                 = "utf-8"
 
 
 #
@@ -210,8 +214,8 @@ def parse_flows_delay(item, index, maxDelay, itemKey):
         try:
             delay = parse_time_str(str(delay), maxDelay)
         except ValueError as error:
-            raise LayoutError, LayoutError('%s "%s" in item #%d failed to be parsed:\n%s' %
-                                          (itemKey, delay, index, error)), sys.exc_info()[2]
+            raise LayoutError('%s "%s" in item #%d failed to be parsed:\n%s' %
+                             (itemKey, delay, index, error))
     return delay
 
 
@@ -302,7 +306,7 @@ def who_runs_first(scheme, pantheonDir):
     if not os.path.exists(schemePath):
         raise LayoutError('Path of scheme "%s" does not exist:\n%s' % (scheme, schemePath))
 
-    runsFirst  = subprocess.check_output([schemePath, 'run_first']).strip()
+    runsFirst = subprocess.check_output([schemePath, 'run_first']).decode(UTF8).strip()
 
     if runsFirst != RECEIVER and runsFirst != SENDER:
         raise LayoutError('Scheme "%s" does not tell if "receiver" or "sender" runs first' % scheme)
@@ -369,8 +373,7 @@ def process_time_arg(argName, timeArg, maxTimeUs):
     try:
         return parse_time_str(timeArg, maxTimeUs)
     except ValueError as error:
-        raise ArgsError, ArgsError('Processing of argument "%s" failed:\n%s' %
-                                  (argName, error)), sys.exc_info()[2]
+        raise ArgsError('Processing of argument "%s" failed:\n%s' % (argName, error))
 
 
 #
@@ -657,31 +660,29 @@ def parse_arguments():
 # Entry function
 #
 if __name__ == '__main__':
+    if os.geteuid() != 0:
+        print("Script not started as root. Running sudo...")
+        scriptArgs = ['sudo', sys.executable] + sys.argv + [os.environ]
+        os.execlpe('sudo', *scriptArgs)
+
+    user = os.getenv(SUDO_USER)
+    args = parse_arguments()
+    os.seteuid(pwd.getpwnam(user).pw_uid) # drop root privileges
+
     try:
-        if os.geteuid() == 0:
-            sys.exit("Please, do not run as root. I need to learn your user name.")
+        args   = process_arguments(args)
+        layout = parse_layout(args[LAYOUT_PATH], args[RUNTIME], args[PANTHEON], args[MAX_DELAY])
 
-        user = getpass.getuser()
-        args = parse_arguments()
+    except ArgsError as error:
+        print("Arguments processing failed:\n%s" % error)
+        sys.exit(1)
+    except LayoutError as error:
+        print("Layout parsing failed:\n%s" % error)
+        sys.exit(1)
 
-        try:
-            args   = process_arguments(args)
-            layout = parse_layout(args[LAYOUT_PATH], args[RUNTIME], args[PANTHEON], args[MAX_DELAY])
+    save_metadata(args, layout)
+    os.seteuid(0) # regain root privileges
 
-        except ArgsError as error:
-            print("Arguments processing failed:\n%s" % error)
-            sys.exit(1)
-        except LayoutError as error:
-            print("Layout parsing failed:\n%s" % error)
-            sys.exit(1)
-
-        save_metadata(args, layout)
-
-        print("Testing:")
-
-        subprocess.call(['sudo', 'python', 'test.py', user, args[DIR], args[PANTHEON]])
-
-        print("Done.")
-
-    except KeyboardInterrupt:
-        print("KeyboardInterrupt was caught")
+    print("Testing:")
+    test.test(user, args[DIR], args[PANTHEON])
+    print("Done.")

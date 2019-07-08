@@ -76,7 +76,7 @@ class MininetLogger( Logger, object ):
     """Mininet-specific logger
        Enable each mininet .py file to with one import:
 
-       from lib.mininet.log import [lg, info, error]
+       from variable_delay.third_party.mininet.log import [lg, info, error]
 
        ...get a default logger that doesn't require one newline per logging
        call.
@@ -125,7 +125,7 @@ class MininetLogger( Logger, object ):
         self.handlers[ 0 ].setLevel( level )
 
     # pylint: disable=method-hidden
-    # "An attribute inherited from lib.mininet.log hide this method" (sic)
+    # "An attribute inherited from variable_delay.third_party.mininet.log hide this method" (sic)
     # Not sure why this is occurring - this function definitely gets called.
 
     # See /usr/lib/python2.5/logging/__init__.py; modified from warning()

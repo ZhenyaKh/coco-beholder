@@ -8,8 +8,8 @@ Optionally uses gnome-terminal.
 
 from os import environ
 
-from lib.mininet.log import error
-from lib.mininet.util import quietRun, errRun
+from variable_delay.third_party.mininet.log import error
+from variable_delay.third_party.mininet.util import quietRun, errRun
 
 def tunnelX11( node, display=None):
     """Create an X11 tunnel from node:6000 to the root host

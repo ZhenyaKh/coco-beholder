@@ -14,9 +14,9 @@ from subprocess import ( Popen, PIPE, check_output as co,
                          CalledProcessError )
 import time
 
-from lib.mininet.log import info
-from lib.mininet.term import cleanUpScreens
-from lib.mininet.util import decode
+from variable_delay.third_party.mininet.log import info
+from variable_delay.third_party.mininet.term import cleanUpScreens
+from variable_delay.third_party.mininet.util import decode
 
 def sh( cmd ):
     "Print a command and send it to the shell"

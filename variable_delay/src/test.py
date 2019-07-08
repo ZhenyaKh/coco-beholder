@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import sys
 from time import sleep
 import time
 import signal
@@ -12,12 +11,14 @@ from subprocess import PIPE
 import threading
 from multiprocessing import Pool, cpu_count
 import re
+import traceback
+import shlex
 
 import ipaddress
 
-from lib.mininet.moduledeps import pathCheck
-from lib.mininet.net import Mininet
-from lib.mininet.net import CLI
+from variable_delay.third_party.mininet.moduledeps import pathCheck
+from variable_delay.third_party.mininet.net import Mininet
+from variable_delay.third_party.mininet.net import CLI
 
 USER                = 1
 DIR                 = 2
@@ -72,15 +73,19 @@ PORT                = 50000
 SECOND              = 1.0
 TIMEOUT_SEC         = 5.0
 BRIDGE              = 'br0'
-PATH                = 'PATH'
-MININET             = os.path.join(os.getcwd(), 'lib', 'mininet')
-MNEXE               = os.path.join(MININET, 'mnexec')
 
 
 #
 # Custom Exception class for errors connected to processing of metadata containing testing's input
 #
 class MetadataError(Exception):
+    pass
+
+
+#
+# Custom Exception class for errors connected to testing runtime
+#
+class TestError(Exception):
     pass
 
 
@@ -93,7 +98,7 @@ globalClientCmds = [] # Global array of commands to launch clients -- for multip
 #
 def start_client(flowId):
     print(flowId)
-    x = globalClients[flowId].popen(globalClientCmds[flowId])
+    x = globalClients[flowId].popen(globalClientCmds[flowId]).pid
     print("%f" % time.time())
     return x
 
@@ -150,13 +155,13 @@ class Test(object):
 
         self.senderDumpPopens   = []   # per flow tcpdump processes recording at the flow's sender
         self.receiverDumpPopens = []   # per flow tcpdump processes recording at the flow's receiver
-        self.serverPopens       = []   # per flow processes of launched servers
-        self.clientPopens       = []   # per flow processes of launched clients
+        self.serverPids         = []   # per flow pids of processes of launched servers
+        self.clientPids         = []   # per flow pids of processes of launched clients
 
         # arrays of delta times and of corresponding delays -- to variate central link netem delay
-        self.deltasArraySec,     self.delaysArrayUs        = self.compute_delay_steps()
+        self.deltasArraySec,     self.delaysArrayUs      = self.compute_delay_steps()
         # per flow link to container keeping sender/receiver processes
-        self.senderPopenHolders, self.receiverPopenHolders = self.compute_popen_holders()
+        self.senderPidHolders,   self.receiverPidHolders = self.compute_pid_holders()
 
         self.startsSchedule = self.compute_starts_schedule(layout) # schedule of starting flows
         self.startEvent     = threading.Event()                    # sync with thread starting flows
@@ -215,9 +220,9 @@ class Test(object):
             with open(metadataPath) as metadataFile:
                 metadata = json.load(metadataFile)
         except IOError as error:
-            raise MetadataError, MetadataError("Failed to open meta: %s" % error), sys.exc_info()[2]
+            raise MetadataError("Failed to open meta: %s" % error)
         except ValueError as error:
-            raise MetadataError, MetadataError("Failed to load meta: %s" % error), sys.exc_info()[2]
+            raise MetadataError("Failed to load meta: %s" % error)
 
         return metadata
 
@@ -280,7 +285,7 @@ class Test(object):
     #
     def compute_delay_steps(self):
         runtimeUs       = self.runtimeSec * USEC_PER_SEC
-        deltasNumber    = runtimeUs / self.deltaUs
+        deltasNumber    = int(runtimeUs / self.deltaUs)
         reminderDeltaUs = runtimeUs % self.deltaUs
         deltasSecArray  = [float(self.deltaUs) / USEC_PER_SEC] * deltasNumber
 
@@ -333,23 +338,23 @@ class Test(object):
 
 
     #
-    # Method computes per flow link to container keeping sender/receiver processes
-    # returns array of links to containers keeping sender's processes and array of links to
-    # containers keeping receiver's processes
+    # Method computes per flow link to container keeping pids of sender/receiver processes
+    # returns array of links to containers keeping pids of sender's processes and array of links to
+    # containers keeping pids of receiver's processes
     #
-    def compute_popen_holders(self):
-        senderPopenHolders   = []
-        receiverPopenHolders = []
+    def compute_pid_holders(self):
+        senderPidHolders   = []
+        receiverPidHolders = []
 
         for i in range(0, self.flows):
             if self.runsFirst[i] == RECEIVER:
-                senderPopenHolders  .append(self.clientPopens)
-                receiverPopenHolders.append(self.serverPopens)
+                senderPidHolders  .append(self.clientPids)
+                receiverPidHolders.append(self.serverPids)
             else:
-                senderPopenHolders.  append(self.serverPopens)
-                receiverPopenHolders.append(self.clientPopens)
+                senderPidHolders.  append(self.serverPids)
+                receiverPidHolders.append(self.clientPids)
 
-        return senderPopenHolders, receiverPopenHolders
+        return senderPidHolders, receiverPidHolders
 
 
     #
@@ -370,7 +375,7 @@ class Test(object):
         self.network.addLink(self.leftRouter, self.rightRouter)
 
         # getting two ip addresses for the interfaces of the two routers
-        subnet = freeSubnets.next()
+        subnet = next(freeSubnets)
         ipPool = ['%s/%d' % (host, subnet.prefixlen) for host in list(subnet.hosts())]
 
         leftRouterIntf  = self.leftRouter. intfs[self.flows]
@@ -381,12 +386,12 @@ class Test(object):
         self.rightRouter.setIP(ipPool[1], intf=rightRouterIntf)
 
         # turning off TCP segmentation offload and UDP fragmentation offload!
-        self.leftRouter. cmd('ethtool -K %s tx off sg off tso off ufo off' % leftRouterIntf)
-        self.rightRouter.cmd('ethtool -K %s tx off sg off tso off ufo off' % rightRouterIntf)
+        Test.cmd(self.leftRouter,  'ethtool -K %s tx off sg off tso off ufo off' % leftRouterIntf)
+        Test.cmd(self.rightRouter, 'ethtool -K %s tx off sg off tso off ufo off' % rightRouterIntf)
 
         # setting arp entries for the entire subnet consisting of the two routers
-        self.leftRouter. cmd('arp', '-s', rightRouterIntf.IP(), rightRouterIntf.MAC())
-        self.rightRouter.cmd('arp', '-s', leftRouterIntf. IP(), leftRouterIntf. MAC())
+        Test.cmd(self.leftRouter,  'arp -s %s %s' % (rightRouterIntf.IP(), rightRouterIntf.MAC()))
+        Test.cmd(self.rightRouter, 'arp -s %s %s' % (leftRouterIntf. IP(), leftRouterIntf. MAC()))
 
         # allowing the two halves of the dumbbell to exchange packets
         self.leftRouter. setDefaultRoute('via %s' % rightRouterIntf.IP())
@@ -397,7 +402,9 @@ class Test(object):
     # Method makes setup after reboot for each scheme
     #
     def setup_schemes_after_reboot(self):
-        for scheme, schemePath in self.schemePaths.iteritems():
+        for scheme in self.schemePaths:
+            schemePath = self.schemePaths[scheme]
+
             popen = subprocess.Popen([schemePath, 'setup_after_reboot'], stdout=PIPE, stderr=PIPE)
 
             output, error = popen.communicate()
@@ -424,28 +431,28 @@ class Test(object):
         self.rightNetemCmd = netemCmd.format(rightIntf,
                                              self.jitterUs, self.rateMbps, self.secondQueuePkts)
 
-        self.leftRouter. cmd(self.leftNetemCmd  % self.delaysArrayUs[0])
-        self.rightRouter.cmd(self.rightNetemCmd % self.delaysArrayUs[0])
+        Test.cmd(self.leftRouter,  self.leftNetemCmd  % self.delaysArrayUs[0])
+        Test.cmd(self.rightRouter, self.rightNetemCmd % self.delaysArrayUs[0])
 
         # setting netem for all the links in the left and right halves of the dumbbell topology:
-        netemCmd  = 'tc qdisc replace dev %s root netem delay %dus rate %fMbit limit %d'
-        bridgeCmd = 'tc qdisc replace dev %s-%s root netem limit %d'
+        ethCmd = 'tc qdisc replace dev %s root netem delay %dus rate %fMbit limit %d'
+        brCmd  = 'tc qdisc replace dev %s-%s root netem limit %d'
 
         for i in range(0, self.flows):
-            self.leftRouter.   cmd(netemCmd % (self.leftRouter.intfs[i],  self.leftDelaysUs[i],
-                                               self.leftRatesMbps[i],     self.leftQueuesPkts[i]))
+            Test.cmd(self.leftRouter,    ethCmd % (self.leftRouter.intfs[i],  self.leftDelaysUs[i],
+                                                   self.leftRatesMbps[i],  self.leftQueuesPkts[i]))
 
-            self.leftHosts[i]. cmd(netemCmd % (self.leftHosts[i].intf(),  self.leftDelaysUs[i],
-                                               self.leftRatesMbps[i],     self.leftQueuesPkts[i]))
+            Test.cmd(self.leftHosts[i],  ethCmd % (self.leftHosts[i].intf(),  self.leftDelaysUs[i],
+                                                   self.leftRatesMbps[i],  self.leftQueuesPkts[i]))
 
-            self.rightRouter.  cmd(netemCmd % (self.rightRouter.intfs[i], self.rightDelaysUs[i],
-                                               self.rightRatesMbps[i],    self.rightQueuesPkts[i]))
+            Test.cmd(self.rightRouter,   ethCmd % (self.rightRouter.intfs[i], self.rightDelaysUs[i],
+                                                   self.rightRatesMbps[i], self.rightQueuesPkts[i]))
 
-            self.rightHosts[i].cmd(netemCmd % (self.rightHosts[i].intf(), self.rightDelaysUs[i],
-                                               self.rightRatesMbps[i],    self.rightQueuesPkts[i]))
+            Test.cmd(self.rightHosts[i], ethCmd % (self.rightHosts[i].intf(), self.rightDelaysUs[i],
+                                                   self.rightRatesMbps[i], self.rightQueuesPkts[i]))
 
-            self.leftHosts[i]. cmd(bridgeCmd % (self.leftHosts[i],  BRIDGE, DEFAULT_QUEUE_SIZE))
-            self.rightHosts[i].cmd(bridgeCmd % (self.rightHosts[i], BRIDGE, DEFAULT_QUEUE_SIZE))
+            Test.cmd(self.leftHosts[i],  brCmd % (self.leftHosts[i],  BRIDGE, DEFAULT_QUEUE_SIZE))
+            Test.cmd(self.rightHosts[i], brCmd % (self.rightHosts[i], BRIDGE, DEFAULT_QUEUE_SIZE))
 
 
     #
@@ -472,14 +479,14 @@ class Test(object):
             receiverDumpPath = os.path.join(self.dir, receiverDumpName)
             senderDumpPath   = os.path.join(self.dir, senderDumpName)
 
-            cmd = 'tcpdump -tt -nn -i %s -Z %s -B %d -w %s host %s and host %s and (tcp or udp)'
+            cmd = 'tcpdump -tt -nn -i {} -Z {} -B {:d} -w "{}" host {} and host {} and (tcp or udp)'
 
-            receiverDumpPopen = receiverHost.popen(
-            cmd % (receiverIntf, self.user, self.bufferKiB, receiverDumpPath, receiverIp, senderIp))
+            receiverDumpPopen = receiverHost.popen(shlex.split(cmd.format(
+                receiverIntf, self.user, self.bufferKiB, receiverDumpPath, receiverIp, senderIp)))
 
-            senderDumpPopen   = senderHost.popen(
-            cmd % (senderIntf,   self.user, self.bufferKiB, senderDumpPath,   receiverIp, senderIp))
-
+            senderDumpPopen   = senderHost.  popen(shlex.split(cmd.format(
+                senderIntf,   self.user, self.bufferKiB, senderDumpPath,   receiverIp, senderIp)))
+            
             self.receiverDumpPopens.append(receiverDumpPopen)
             self.senderDumpPopens.  append(senderDumpPopen)
 
@@ -505,14 +512,14 @@ class Test(object):
 
             schemePath = self.schemePaths[self.schemes[i]]
 
-            serverPopen = server.popen(
-                ['sudo', '-u', self.user, schemePath, self.runsFirst[i], str(PORT)])
+            serverPid = server.popen(
+                ['sudo', '-u', self.user, schemePath, self.runsFirst[i], str(PORT)]).pid
 
-            self.serverPopens.append(serverPopen)
+            self.serverPids.append(serverPid)
 
             # Check if the server's ready. Maybe, this is not the best way but in Pantheon they just
             # sleep for three seconds after opening all the servers.
-            while not server.cmd("lsof -i :%d" % PORT).strip(): pass
+            while server.cmd('lsof -i :%d' % PORT).find('PID') == -1: pass
 
             runsSecond = RECEIVER if self.runsFirst[i] == SENDER else SENDER
 
@@ -548,7 +555,7 @@ class Test(object):
     def start_clients(self):
         benchmarkStart = timeStart = time.time() # TODO: remove benchmark
 
-        self.clientPopens.extend(self.pool.map(start_client, self.startsSchedule[0]))
+        self.clientPids.extend(self.pool.map(start_client, self.startsSchedule[0]))
         print("!", time.time() - benchmarkStart)
 
         self.startEvent.set()
@@ -556,7 +563,7 @@ class Test(object):
         for i in range(1, len(self.startsSchedule)):
             sleep(SECOND - ((time.time() - timeStart) % SECOND))
 
-            self.clientPopens.extend(self.pool.map(start_client, self.startsSchedule[i]))
+            self.clientPids.extend(self.pool.map(start_client, self.startsSchedule[i]))
             print("#", time.time())
 
         print("debug benchmark 1: %f" % (time.time() - benchmarkStart))
@@ -575,14 +582,14 @@ class Test(object):
             timeStart = time.time()
 
             for i in range(1, intervalsNumber - 1):
-                self.leftRouter. cmd(self.leftNetemCmd  % self.delaysArrayUs[i])
-                self.rightRouter.cmd(self.rightNetemCmd % self.delaysArrayUs[i])
+                Test.cmd(self.leftRouter,  self.leftNetemCmd  % self.delaysArrayUs[i])
+                Test.cmd(self.rightRouter, self.rightNetemCmd % self.delaysArrayUs[i])
                 sleep(self.deltasArraySec[i] - ((time.time() - timeStart) % self.deltasArraySec[i]))
 
             timeStart = time.time()
 
-            self.leftRouter. cmd(self.leftNetemCmd  % self.delaysArrayUs[-1])
-            self.rightRouter.cmd(self.rightNetemCmd % self.delaysArrayUs[-1])
+            Test.cmd(self.leftRouter,  self.leftNetemCmd  % self.delaysArrayUs[-1])
+            Test.cmd(self.rightRouter, self.rightNetemCmd % self.delaysArrayUs[-1])
             sleep(self.deltasArraySec[-1] - ((time.time() - timeStart) % self.deltasArraySec[-1]))
 
         print("debug benchmark 2: %f" % (time.time() - benchmarkStart))
@@ -599,11 +606,11 @@ class Test(object):
         for dumpPopen in self.receiverDumpPopens:
             os.kill(dumpPopen.pid, signal.SIGTERM)
 
-        for flowId, holder in enumerate(self.senderPopenHolders):
-            os.killpg(os.getpgid(holder[flowId].pid), signal.SIGKILL)
+        for flowId, holder in enumerate(self.senderPidHolders):
+            os.killpg(os.getpgid(holder[flowId]), signal.SIGKILL)
 
-        for flowId, holder in enumerate(self.receiverPopenHolders):
-            os.killpg(os.getpgid(holder[flowId].pid), signal.SIGKILL)
+        for flowId, holder in enumerate(self.receiverPidHolders):
+            os.killpg(os.getpgid(holder[flowId]), signal.SIGKILL)
 
         self.wait_child_processes()
 
@@ -624,15 +631,15 @@ class Test(object):
     # Method kills client, server and tcpdump processes in case of testing error
     #
     def kill_processes_emergently(self):
-        for clientPopen in self.clientPopens:
+        for clientPid in self.clientPids:
             try:
-                os.killpg(os.getpgid(clientPopen.pid), signal.SIGKILL)
+                os.killpg(os.getpgid(clientPid), signal.SIGKILL)
             except OSError:
                 pass
 
-        for serverPopen in self.serverPopens:
+        for serverPid in self.serverPids:
             try:
-                os.killpg(os.getpgid(serverPopen.pid), signal.SIGKILL)
+                os.killpg(os.getpgid(serverPid), signal.SIGKILL)
             except OSError:
                 pass
 
@@ -663,20 +670,20 @@ class Test(object):
         ipPools = [None] * self.flows
 
         router = self.network.addHost(routerName)
-        router.cmd('sysctl -w net.ipv4.ip_forward=1')
-        router.cmd('ifconfig lo up')
-        self.turn_off_ipv6(router)
+        Test.cmd(router, 'sysctl -w net.ipv4.ip_forward=1')
+        Test.cmd(router, 'ifconfig lo up')
+        Test.turn_off_ipv6(router)
 
         for i in range(0, self.flows):
             hosts[i] = self.network.addHost('%s%d' % (hostsLiteral, (i + 1)))
-            hosts[i].cmd('ifconfig lo up')
-            self.turn_off_ipv6(hosts[i])
+            Test.cmd(hosts[i], 'ifconfig lo up')
+            Test.turn_off_ipv6(hosts[i])
 
             # connecting the new host to one of the router interfaces
             self.network.addLink(hosts[i], router)
 
             # getting two IPs with mask for the router interface and for the host interface
-            subnet     = freeSubnets.next()
+            subnet     = next(freeSubnets)
             ipPools[i] = ['%s/%d' % (host, subnet.prefixlen) for host in list(subnet.hosts())]
 
             # assigning IPs with mask to the router interface and to the host interface
@@ -684,16 +691,36 @@ class Test(object):
             hosts[i].setIP(ipPools[i][0])
 
             # turning off TCP segmentation offload and UDP fragmentation offload!
-            router.  cmd('ethtool -K %s tx off sg off tso off ufo off' % router.intfs[i])
-            hosts[i].cmd('ethtool -K %s tx off sg off tso off ufo off' % hosts[i].intf())
+            Test.cmd(router,   'ethtool -K %s tx off sg off tso off ufo off' % router.intfs[i])
+            Test.cmd(hosts[i], 'ethtool -K %s tx off sg off tso off ufo off' % hosts[i].intf())
 
-            self.setup_bridge(hosts[i], ipPools[i][0], router.intfs[i].IP())
+            Test.setup_bridge(hosts[i], ipPools[i][0], router.intfs[i].IP())
 
             # setting arp entries for the entire subnet -- only after setting up the bridge!
-            router.  cmd('arp', '-s', hosts[i].intf().IP(), hosts[i].intf().MAC())
-            hosts[i].cmd('arp', '-s', router.intfs[i].IP(), router.intfs[i].MAC())
+            Test.cmd(router,   'arp -s %s %s' % (hosts[i].intf().IP(), hosts[i].intf().MAC()))
+            Test.cmd(hosts[i], 'arp -s %s %s' % (router.intfs[i].IP(), router.intfs[i].MAC()))
 
         return hosts, router
+
+
+    #
+    # Method runs command in node
+    # param [in] node    - node in which command is run
+    # param [in] command - command to run
+    # throws TestError
+    # returns command output
+    #
+    @staticmethod
+    def cmd(node, command):
+        popen = node.popen(command)
+
+        output, error = popen.communicate()
+
+        if popen.returncode != 0:
+            raise TestError("This command failed with exit code %d:\n%s\nError message:\n%s\nOutput:%s"%
+                           (popen.returncode, command, error, output))
+
+        return output
 
 
     #
@@ -701,9 +728,14 @@ class Test(object):
     #
     def wait_child_processes(self):
 
-        all = [self.clientPopens, self.serverPopens, self.senderDumpPopens, self.receiverDumpPopens]
+        for pids in [self.clientPids, self.serverPids]:
+            for pid in pids:
+                try:
+                    os.waitpid(pid, 0)
+                except OSError:
+                    pass
 
-        for popens in all:
+        for popens in [self.senderDumpPopens, self.receiverDumpPopens]:
             for popen in popens:
                 try:
                     os.waitpid(popen.pid, 0)
@@ -714,13 +746,17 @@ class Test(object):
     #
     # Method checks if kernel dropped any packets by checking tcpdump output on its termination
     #
-    def  check_dropped_packets(self):
+    def check_dropped_packets(self):
         droppedPackets = 0
 
         for popens in [self.senderDumpPopens, self.receiverDumpPopens]:
             for popen in popens:
                 output = popen.communicate()[1]
-                result = re.search('(\d+) packets dropped', output)
+                result = re.search(b'(\d+) packets dropped', output)
+
+                if result is None:
+                    raise TestError("Tcpdump failed with message:\n%s" % output)
+
                 droppedPackets += int(result.group(1))
 
         if droppedPackets != 0:
@@ -732,10 +768,11 @@ class Test(object):
     # Method turns off IPv6 support at the node
     # param [in] node - node at which ipv6 should be turned off
     #
-    def turn_off_ipv6(self, node):
-        node.cmd('sysctl -w net.ipv6.conf.all.disable_ipv6=1')
-        node.cmd('sysctl -w net.ipv6.conf.default.disable_ipv6 = 1')
-        node.cmd('sysctl -w net.ipv6.conf.lo.disable_ipv6 = 1')
+    @staticmethod
+    def turn_off_ipv6(node):
+        Test.cmd(node, 'sysctl -w net.ipv6.conf.all.disable_ipv6=1')
+        Test.cmd(node, 'sysctl -w net.ipv6.conf.default.disable_ipv6=1')
+        Test.cmd(node, 'sysctl -w net.ipv6.conf.lo.disable_ipv6=1')
 
 
     #
@@ -743,43 +780,48 @@ class Test(object):
     # param [in] hostIp    - IP with mask of host at which Linux bridge should be set up
     # param [in] gatewayIP - IP without mask of gateway for the host
     #
-    def setup_bridge(self, host, hostIp, gatewayIP):
+    @staticmethod
+    def setup_bridge(host, hostIp, gatewayIP):
         bridge = "%s-%s" % (host, BRIDGE)
 
         # adding the bridge interface
-        host.cmd('ip link add name %s type bridge'             % bridge)
+        Test.cmd(host, 'ip link add name %s type bridge'             % bridge)
         # attaching the main host interface to the bridge interface
-        host.cmd('ip link set %s master %s'                    % (host.intf(), bridge))
+        Test.cmd(host, 'ip link set %s master %s'                    % (host.intf(), bridge))
         # setting the bridge interface up
-        host.cmd('ip link set dev %s up'                       % bridge)
+        Test.cmd(host, 'ip link set dev %s up'                       % bridge)
         # assigning the ip address to the host bridge interface
-        host.cmd('ip addr add dev %s %s'                       % (bridge, hostIp))
+        Test.cmd(host, 'ip addr add dev %s %s'                       % (bridge, hostIp))
         # setting the peer interface of the router as the gateway
-        host.cmd('route add default gw %s dev %s'              % (gatewayIP, bridge))
+        Test.cmd(host, 'ip route add default via %s dev %s'          % (gatewayIP, bridge))
         # zero out ip of the main host interface to remove the interface from route and arp tables
-        host.cmd('ifconfig %s 0.0.0.0 up'                      % host.intf())
+        Test.cmd(host, 'ifconfig %s 0.0.0.0 up'                      % host.intf())
         # turning off TCP segmentation offload and UDP fragmentation offload!
-        host.cmd('ethtool -K %s tx off sg off tso off ufo off' % bridge)
+        Test.cmd(host, 'ethtool -K %s tx off sg off tso off ufo off' % bridge)
 
 
 #
-# Entry function
+# Function performs testing -- can be run as root only
+# param [in] user     - user running testing
+# param [in] dir      - full path to output directory
+# param [in] pantheon - full path to Pantheon directory
+# returns if testing failed or succeeded
 #
-if __name__ == '__main__':
-    user     = sys.argv[USER    ]
-    dir      = sys.argv[DIR     ]
-    pantheon = sys.argv[PANTHEON]
+def test(user, dir, pantheon):
     exitCode = EXIT_SUCCESS
 
-    os.environ[PATH] = MININET + os.pathsep + os.environ[PATH]
-    pathCheck(MNEXE, 'ifconfig', 'ethtool', 'tc', 'tcpdump', 'lsof', 'sysctl', 'arp', 'route', 'ip')
+    pathCheck('ifconfig', 'ethtool', 'tc', 'tcpdump', 'lsof', 'sysctl', 'arp', 'route', 'ip')
 
     try:
         test = Test(user, dir, pantheon)
         test.test()
         CLI(test.network)
     except MetadataError as error:
-        print("Metadata error:\n%s" % error)
+        print("Metadata ERROR:\n%s" % error)
+        exitCode = EXIT_FAILURE
+    except TestError:
+        print("Testing ERROR:\n")
+        traceback.print_exc()
         exitCode = EXIT_FAILURE
     except KeyboardInterrupt:
         print("KeyboardInterrupt was caught")
@@ -788,4 +830,4 @@ if __name__ == '__main__':
     exitMessage = SUCCESS_MESSAGE if exitCode == EXIT_SUCCESS else FAILURE_MESSAGE
     print(exitMessage)
 
-    sys.exit(exitCode)
+    return exitCode

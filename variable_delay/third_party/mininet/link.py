@@ -24,8 +24,8 @@ TCIntf: interface with bandwidth limiting and delay via tc
 Link: basic link class for creating veth pairs
 """
 
-from lib.mininet.log import info, error, debug
-from lib.mininet.util import makeIntfPair
+from variable_delay.third_party.mininet.log import info, error, debug
+from variable_delay.third_party.mininet.util import makeIntfPair
 import re
 
 class Intf( object ):
@@ -533,7 +533,7 @@ class OVSLink( Link ):
 
     def __init__( self, node1, node2, **kwargs ):
         "See Link.__init__() for options"
-        from lib.mininet.node import OVSSwitch
+        from variable_delay.third_party.mininet.node import OVSSwitch
         self.isPatchLink = False
         if ( isinstance( node1, OVSSwitch ) and
              isinstance( node2, OVSSwitch ) ):

@@ -36,9 +36,9 @@ import time
 import os
 import atexit
 
-from lib.mininet.log import info, output, error
-from lib.mininet.term import makeTerms, runX11
-from lib.mininet.util import ( quietRun, dumpNodeConnections,
+from variable_delay.third_party.mininet.log import info, output, error
+from variable_delay.third_party.mininet.term import makeTerms, runX11
+from variable_delay.third_party.mininet.util import ( quietRun, dumpNodeConnections,
                            dumpPorts )
 
 class CLI( Cmd ):
