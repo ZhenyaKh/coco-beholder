@@ -582,14 +582,14 @@ class Test(object):
             timeStart = time.time()
 
             for i in range(1, intervalsNumber - 1):
-                Test.cmd(self.leftRouter,  self.leftNetemCmd  % self.delaysArrayUs[i])
-                Test.cmd(self.rightRouter, self.rightNetemCmd % self.delaysArrayUs[i])
+                self.leftRouter .cmd(self.leftNetemCmd  % self.delaysArrayUs[i]) # fast Node.cmd!!!
+                self.rightRouter.cmd(self.rightNetemCmd % self.delaysArrayUs[i]) # fast Node.cmd!!!
                 sleep(self.deltasArraySec[i] - ((time.time() - timeStart) % self.deltasArraySec[i]))
 
             timeStart = time.time()
 
-            Test.cmd(self.leftRouter,  self.leftNetemCmd  % self.delaysArrayUs[-1])
-            Test.cmd(self.rightRouter, self.rightNetemCmd % self.delaysArrayUs[-1])
+            self.leftRouter .cmd(self.leftNetemCmd  % self.delaysArrayUs[-1])    # fast Node.cmd!!!
+            self.rightRouter.cmd(self.rightNetemCmd % self.delaysArrayUs[-1])    # fast Node.cmd!!!
             sleep(self.deltasArraySec[-1] - ((time.time() - timeStart) % self.deltasArraySec[-1]))
 
         print("debug benchmark 2: %f" % (time.time() - benchmarkStart))
@@ -717,8 +717,8 @@ class Test(object):
         output, error = popen.communicate()
 
         if popen.returncode != 0:
-            raise TestError("This command failed with exit code %d:\n%s\nError message:\n%s\nOutput:%s"%
-                           (popen.returncode, command, error, output))
+            raise TestError("This command failed with exit code %d:\n%s\nError message:\n%s"%
+                           (popen.returncode, command, error))
 
         return output
 
