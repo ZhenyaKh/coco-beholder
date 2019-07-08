@@ -73,6 +73,7 @@ PORT                = 50000
 SECOND              = 1.0
 TIMEOUT_SEC         = 5.0
 BRIDGE              = 'br0'
+PID                 = 'PID'
 
 
 #
@@ -83,7 +84,7 @@ class MetadataError(Exception):
 
 
 #
-# Custom Exception class for errors connected to testing runtime
+# Custom Exception class for errors connected to testing
 #
 class TestError(Exception):
     pass
@@ -517,9 +518,7 @@ class Test(object):
 
             self.serverPids.append(serverPid)
 
-            # Check if the server's ready. Maybe, this is not the best way but in Pantheon they just
-            # sleep for three seconds after opening all the servers.
-            while server.cmd('lsof -i :%d' % PORT).find('PID') == -1: pass
+            Test.wait_for_server(server)
 
             runsSecond = RECEIVER if self.runsFirst[i] == SENDER else SENDER
 
@@ -741,6 +740,26 @@ class Test(object):
                     os.waitpid(popen.pid, 0)
                 except OSError:
                     pass
+
+
+    #
+    # Method ensures that server really got started on the port. Maybe, this is not the best way
+    # but in Pantheon they just sleep for three seconds after opening all the servers.
+    # param [in] server - server to check
+    #
+    @staticmethod
+    def wait_for_server(server):
+        timeStart = time.time()
+
+        while True:
+            output = server.cmd('lsof -i :%d' % PORT)
+
+            if output.find(PID) != -1:
+                return
+
+            if time.time() - timeStart > TIMEOUT_SEC:
+                raise TestError("Server failed to start by timeout. Output of lsof command:\n%s" %
+                                output)
 
 
     #
