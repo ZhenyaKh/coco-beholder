@@ -109,12 +109,12 @@ from variable_delay.third_party.mininet.term import cleanUpScreens, makeTerms
 
 from variable_delay.third_party.mininet.moduledeps import pathCheck
 
-MININET = os.path.join('variable_delay', 'third_party', 'mininet')
+MININET = os.path.dirname(os.path.realpath(__file__))
 os.environ['PATH'] = MININET + os.pathsep + os.environ['PATH']
 pathCheck(os.path.join(MININET, 'mnexec'))
 
 # Mininet version: should be consistent with README and LICENSE
-VERSION = "2.3.0d5"
+VERSION = "2.3.0d5" # revision de28f67a97fc8915cc1586c984465d89a016d8eb (Jun 10, 2019) on Github
 
 class Mininet( object ):
     "Network emulation with hosts spawned in network namespaces."

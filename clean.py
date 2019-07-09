@@ -2,15 +2,18 @@
 
 import argparse
 import sys
-import os.path
 import os
 
-SENDER   = 'sender'
-RECEIVER = 'receiver'
-PCAP     = '.pcap'
-JSON     = '.json'
-PNG      = '.png'
-LOG      = '.log'
+SENDER              = 'sender'
+RECEIVER            = 'receiver'
+PCAP                = '.pcap'
+JSON                = '.json'
+PNG                 = '.png'
+LOG                 = '.log'
+WORKING_DIR         = os.path.dirname(os.path.realpath(__file__))
+DEFAULT_DUMPS_PATH  = os.path.join(WORKING_DIR, 'dumps')
+DEFAULT_GRAPHS_PATH = os.path.join(WORKING_DIR, 'graphs')
+
 
 parser = argparse.ArgumentParser(description=
 'The script cleans two directories with data. The script deletes only pcap/json/png/log files and '
@@ -35,10 +38,10 @@ parser.add_argument('-r', '--receivers', '--receiver', action='store_true',
 parser.add_argument('-m', '--mutual', action='store_true',
                     help='among chosen files, delete files common for senders and receivers')
 
-parser.add_argument('-f1', '--folder1', default='dumps',
+parser.add_argument('-f1', '--folder1', default=DEFAULT_DUMPS_PATH,
                     help='directory with dumps to clean, default is "dumps"')
 
-parser.add_argument('-f2', '--folder2', default='graphs',
+parser.add_argument('-f2', '--folder2', default=DEFAULT_GRAPHS_PATH,
                     help='directory with graphs to clean, default is "graphs"')
 
 args = parser.parse_args()

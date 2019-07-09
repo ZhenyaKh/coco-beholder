@@ -16,7 +16,6 @@ DIR                  = 'dir'
 PANTHEON             = 'pantheon'
 FIRST_QUEUE          = '_first-queue'
 SECOND_QUEUE         = '_second-queue'
-DEFAULT_LAYOUT_PATH  = 'layout.yml'
 LAYOUT_PATH          = 'layout-path'
 SORTED_LAYOUT        = 'sorted-layout'
 BASE                 = '_base'
@@ -52,6 +51,11 @@ DEFAULT_QUEUE_SIZE   = 1000
 KIB_IN_MIB           = 1024
 SUDO_USER            = 'SUDO_USER'
 UTF8                 = "utf-8"
+WORKING_DIR          = os.path.dirname(os.path.realpath(__file__))
+DEFAULT_DIR_NAME     = 'dumps'
+DEFAULT_DIR_PATH     = os.path.join(WORKING_DIR, DEFAULT_DIR_NAME)
+DEFAULT_LAYOUT_NAME  = 'layout.yml'
+DEFAULT_LAYOUT_PATH  = os.path.join(WORKING_DIR, DEFAULT_LAYOUT_NAME)
 
 
 #
@@ -135,7 +139,7 @@ def save_default_layout(layoutPath, runtime, rate):
 # topology to argparse argument parser.
 # param [in, out] parser - argparse argument parser
 #
-def add_queue_arguemnts(parser):
+def add_queue_arguments(parser):
     parser.add_argument('-q1', '--first-queue', type=int, metavar='SIZE',
     help='Size of transmit queue of the left router\'s interface at the first end of the central '
          'link of the dumbbell topology, default is %d packets' % DEFAULT_QUEUE_SIZE)
@@ -440,11 +444,11 @@ def process_buffer_argument(bufferArg):
 def add_arguments(parser):
     add_delay_arguments(parser)
 
-    parser.add_argument('-d', '--dir', default='dumps', metavar='DIR',
-    help='Output directory, default is "dumps". Service file metadata.json containing parameters '
+    parser.add_argument('-d', '--dir', default=DEFAULT_DIR_PATH, metavar='DIR',
+    help='Output directory, default is "%s". Service file metadata.json containing parameters '
          'with which testing is actually performed is written there. For each flow, pcap-files, '
          'recorded at interfaces of the two hosts between which the flow runs, are written there '
-         'named "<flow\'s starting #>-<scheme>-<sender/receiver>.pcap"')
+         'named "<flow\'s starting #>-<scheme>-<sender/receiver>.pcap"' % DEFAULT_DIR_NAME)
 
     parser.add_argument('-p', '--pantheon', required=True, metavar='DIR',
     help='Pantheon [pantheon.stanford.edu] directory where congestion control schemes are searched')
@@ -452,7 +456,7 @@ def add_arguments(parser):
     parser.add_argument('-l', '--layout', metavar='FILE',
     help='Input yaml-file defining groups of flows run in the dumbbell topology. Default is "%s" '
          'and during the first run of the script this file is created with example settings.'
-         % DEFAULT_LAYOUT_PATH)
+         % DEFAULT_LAYOUT_NAME)
 
     parser.add_argument('-r', '--rate', default=100.0, type=float, metavar='MBITPS',
     help='Rate of the central link in Mbit/s, type is float, default value is 100.0. If you do not '
@@ -475,7 +479,7 @@ def add_arguments(parser):
     help='Set the operating system capture buffer size to chosen number of MiB (1024 KiB), '
          'default is 2 MiB. The value is set as -B option for tcpdump recordings on all hosts.')
 
-    add_queue_arguemnts(parser)
+    add_queue_arguments(parser)
 
 
 #
@@ -660,13 +664,14 @@ def parse_arguments():
 # Entry function
 #
 if __name__ == '__main__':
+    args = parse_arguments()
+
     if os.geteuid() != 0:
         print("Script not started as root. Running sudo...")
         scriptArgs = ['sudo', sys.executable] + sys.argv + [os.environ]
         os.execlpe('sudo', *scriptArgs)
 
     user = os.getenv(SUDO_USER)
-    args = parse_arguments()
     os.seteuid(pwd.getpwnam(user).pw_uid) # drop root privileges
 
     try:

@@ -1,6 +1,6 @@
 "Module dependency utility functions for Mininet."
 
-from variable_delay.third_party.mininet.util import quietRun, BaseString
+from variable_delay.third_party.mininet.util import quietRun, BaseString, which
 from variable_delay.third_party.mininet.log import info, error, debug
 from os import environ
 
@@ -61,7 +61,7 @@ def pathCheck( *args, **kwargs ):
     "Make sure each program in *args can be found in $PATH."
     moduleName = kwargs.get( 'moduleName', 'it' )
     for arg in args:
-        if not quietRun( 'which ' + arg ):
+        if not which(arg):
             error( 'Cannot find required executable %s.\n' % arg +
                    'Please make sure that %s is installed ' % moduleName +
                    'and available in your $PATH:\n(%s)\n' % environ[ 'PATH' ] )
