@@ -1,12 +1,12 @@
-MNEXEC = mnexec
+MNEXEC = vdlocalmnexec
 
 CFLAGS += -Wall -Wextra
 
-all: mnexec
+all: vdlocalmnexec
 
 clean:
 	rm -f *.pyc $(MNEXEC)
 
-mnexec: mnexec.c net.py
+vdlocalmnexec: mnexec.c net.py
 	cc $(CFLAGS) $(LDFLAGS) $< -o $@
 
