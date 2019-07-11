@@ -4,6 +4,8 @@ import argparse
 import sys
 import os
 
+from variable_delay.src.help_formatter import BlankLinesHelpFormatter
+
 SENDER              = 'sender'
 RECEIVER            = 'receiver'
 PCAP                = '.pcap'
@@ -15,7 +17,7 @@ DEFAULT_DUMPS_PATH  = os.path.join(WORKING_DIR, 'dumps')
 DEFAULT_GRAPHS_PATH = os.path.join(WORKING_DIR, 'graphs')
 
 
-parser = argparse.ArgumentParser(description=
+parser = argparse.ArgumentParser(formatter_class=BlankLinesHelpFormatter, description=
 'The script cleans two directories with data. The script deletes only pcap/json/png/log files and '
 'does not touch any subdirectories. If any of chosen data directories gets completely empty '
 'the script also deletes the directory.')

@@ -4,7 +4,6 @@ from time import sleep
 import time
 import signal
 import os
-import json
 import random
 import subprocess
 from subprocess import PIPE
@@ -20,41 +19,18 @@ from variable_delay.third_party.mininet.moduledeps import pathCheck
 from variable_delay.third_party.mininet.net import Mininet
 from variable_delay.third_party.mininet.net import CLI
 
-USER                = 1
-DIR                 = 2
-PANTHEON            = 3
-METADATA_NAME       = 'metadata.json'
-FIRST_QUEUE         = '_first-queue'
-SECOND_QUEUE        = '_second-queue'
-SORTED_LAYOUT       = 'sorted-layout'
-BASE                = '_base'
-DELTA               = '_delta'
-STEP                = '_step'
-JITTER              = '_jitter'
-RATE                = '_rate'
-MAX_DELAY           = '_max-delay'
-SEED                = '_seed'
-BUFFER              = '_buffer'
-RUNTIME             = '_runtime'
-FLOWS               = 'flows'
-ALL_FLOWS           = '_all-flows'
-SCHEME              = 'scheme'
-LEFT_RATE           = 'left-rate'
-RIGHT_RATE          = 'right-rate'
-LEFT_DELAY          = 'left-delay'
-RIGHT_DELAY         = 'right-delay'
-LEFT_QUEUES         = 'left-queues'
-RIGHT_QUEUES        = 'right-queues'
-DIRECTION           = 'direction'
-START               = 'start'
-RUNS_FIRST          = 'runs-first'
-WRAPPERS_PATH       = os.path.join('src', 'wrappers')
-SENDER              = 'sender'
-RECEIVER            = 'receiver'
+from variable_delay.src.metadata import load_metadata, MetadataError
+from variable_delay.src.layout import LEFTWARD
+from variable_delay.src.metadata_fields import *
+from variable_delay.src.layout_fields import *
+from variable_delay.src.pantheon_constants import *
+
 SUPERNET_SIZE       = 16
 SUBNET_SIZE         = 2
 SUPERNET_ADDRESS    = u'11.0.0.0/%d' % (32-SUPERNET_SIZE)
 SUBNET_PREFIX       = 32 - SUBNET_SIZE
+SUBNETS_NUMBER      = 2 ** (SUPERNET_SIZE - SUBNET_SIZE)
+MAX_FLOWS_NUMBER    = int((SUBNETS_NUMBER - 1) / 2)
 LEFT_HOSTS_LITERAL  = 'a'
 RIGHT_HOSTS_LITERAL = 'b'
 LEFT_ROUTER_NAME    = 'r1'
@@ -66,21 +42,12 @@ EXIT_SUCCESS        = 0
 EXIT_FAILURE        = 1
 SUCCESS_MESSAGE     = "SUCCESS"
 FAILURE_MESSAGE     = "FAILURE"
-DEFAULT_QUEUE_SIZE  = 1000
-LEFTWARD            = '<-'
-RIGHTWARD           = '->'
 PORT                = 50000
 SECOND              = 1.0
 TIMEOUT_SEC         = 5.0
 BRIDGE              = 'br0'
 PID                 = 'PID'
-
-
-#
-# Custom Exception class for errors connected to processing of metadata containing testing's input
-#
-class MetadataError(Exception):
-    pass
+DEFAULT_QUEUE_SIZE  = 1000
 
 
 #
@@ -120,7 +87,7 @@ class Test(object):
         self.dir       = dir               # full path of output directory
         self.pantheon  = pantheon          # full path to Pantheon directory
 
-        metadata = self.load_metadata()
+        metadata = load_metadata(self.dir)
         self.baseUs          = metadata[BASE        ] # initial netem delay at central links
         self.deltaUs         = metadata[DELTA       ] # time period with which to change netem delay
         self.stepUs          = metadata[STEP        ] # step to change netem delay at central link
@@ -210,25 +177,6 @@ class Test(object):
 
 
     #
-    # Method loads metadata of the testing
-    # throws MetadataError
-    # returns dictionary with metadata
-    #
-    def load_metadata(self):
-        metadataPath = os.path.join(self.dir, METADATA_NAME)
-
-        try:
-            with open(metadataPath) as metadataFile:
-                metadata = json.load(metadataFile)
-        except IOError as error:
-            raise MetadataError("Failed to open meta: %s" % error)
-        except ValueError as error:
-            raise MetadataError("Failed to load meta: %s" % error)
-
-        return metadata
-
-
-    #
     # Method generates layout for each flow depending on number of flows in each entry of "layout"
     # field of metadata.
     # param [in] layout - metadata layout
@@ -246,12 +194,9 @@ class Test(object):
             raise MetadataError('Insanity: field "%s"=%d must be %d (sum of all "%s" in "%s")!!!' %
                                (ALL_FLOWS, self.flows, len(perFlowLayout), FLOWS, SORTED_LAYOUT))
 
-        subnetsNumber  = 2**(SUPERNET_SIZE - SUBNET_SIZE)
-        maxFlowsNumber = (subnetsNumber - 1) / 2
-
-        if len(perFlowLayout) > maxFlowsNumber:
+        if len(perFlowLayout) > MAX_FLOWS_NUMBER:
             raise MetadataError('Flows number is %d but, with supernet %s, max flows number is %d' %
-                               (len(perFlowLayout), SUPERNET_ADDRESS, maxFlowsNumber))
+                               (len(perFlowLayout), SUPERNET_ADDRESS, MAX_FLOWS_NUMBER))
 
         return perFlowLayout
 
@@ -267,7 +212,7 @@ class Test(object):
         for scheme in self.schemes:
 
             if scheme not in schemePaths:
-                schemePath = os.path.join(self.pantheon, WRAPPERS_PATH, "%s.py" % scheme)
+                schemePath = os.path.join(self.pantheon, PANTHEON_WRAPPERS_PATH, "%s.py" % scheme)
 
                 if not os.path.exists(schemePath):
                     raise MetadataError('Path of scheme "%s" does not exist:\n%s' %
