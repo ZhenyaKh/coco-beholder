@@ -19,8 +19,8 @@ from variable_delay.src.data_fields import *
 MS_IN_SEC = 1000
 UTF8      = 'utf-8'
 PYTHON3   = 3
-DATA_NAME = 'data.jsonl'
-
+DATA      = 'data'
+JSONL     = 'jsonl'
 
 #
 # Custom Exception class for errors connected to analysis of pcap-files
@@ -40,9 +40,8 @@ class DumpAnalyzer(object):
     # throws MetadataError
     #
     def __init__(self, inDir, outDir):
-        self.inDir    = inDir                                # input directory with dumps
-        self.outDir   = outDir                               # output directory for extracted data
-        self.dataPath = os.path.join(self.outDir, DATA_NAME) # output file for extracted data
+        self.inDir    = inDir  # full path of input directory with dumps
+        self.outDir   = outDir # full path of output directory for extracted data
 
         metadata = load_metadata(self.inDir)
 
@@ -76,14 +75,14 @@ class DumpAnalyzer(object):
 
 
     #
-    # Methods extracts data from pcap-files and saves it in jsonl format to output directory
+    # Methods extracts data from pcap-files and saves it to the output directory
     # throws AnalysisError, DataError
     #
     def extract_data(self):
         if sys.version_info[0] == PYTHON3:
             print("WARNING: You use python3 but for python2 analysis of dumps is ~1.3x faster.")
 
-        save_data(self.dataPath, { RUNTIME : self.runtimeSec, ALL_FLOWS : self.flows }, WRITE_MODE)
+        self.save_all_flows_data()
 
         self.baseTime = self.get_base_time () # TODO: do not forget to check what if None
 
@@ -98,7 +97,7 @@ class DumpAnalyzer(object):
 
             self.departures[flow].clear()
 
-            save_data(self.dataPath, self.get_flow_data(flow), APPEND_MODE)
+            self.save_flow_data(flow)
 
             del self.delays  [flow][:] # Immediately frees memory only for python3. For python2 even
             del self.sizes   [flow][:] # calling gc.collect() directly does not help. The only found
@@ -138,6 +137,18 @@ class DumpAnalyzer(object):
             paths.append(os.path.join(self.inDir, "{:d}-{}-{}.pcap".format(flow, scheme, role)))
 
         return paths
+
+
+    #
+    # Method saves data common for all the flows
+    # throws DataError
+    #
+    def save_all_flows_data(self):
+        data = { RUNTIME : self.runtimeSec, ALL_FLOWS : self.flows }
+
+        filePath = os.path.join(self.outDir, "{}.{}".format(DATA, JSONL))
+
+        save_data(filePath, data, WRITE_MODE)
 
 
     #
@@ -300,20 +311,19 @@ class DumpAnalyzer(object):
 
 
     #
-    # Methods computes data for a flow which should be saved to the output jsonl data file
+    # Method saves data for a particular flow
     # param [in] flow - flow index
+    # throws DataError
     #
-    def get_flow_data(self, flow):
-        data = \
-        {
-            SCHEME    : self.schemes   [flow],
-            DIRECTION : self.directions[flow],
-            ARRIVALS  : self.arrivals  [flow],
-            DELAYS    : self.delays    [flow],
-            SIZES     : self.sizes     [flow]
-        }
+    def save_flow_data(self, flow):
+        filePath = os.path.join(self.outDir, "{}-{:d}.{}".format(DATA, flow + 1, JSONL))
 
-        return data
+        save_data(filePath, { SCHEME    : self.schemes   [flow],
+                              DIRECTION : self.directions[flow] }, WRITE_MODE)
+
+        save_data(filePath, { ARRIVALS  : self.arrivals  [flow] }, APPEND_MODE)
+        save_data(filePath, { DELAYS    : self.delays    [flow] }, APPEND_MODE)
+        save_data(filePath, { SIZES     : self.sizes     [flow] }, APPEND_MODE)
 
 
     #

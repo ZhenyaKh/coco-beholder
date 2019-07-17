@@ -10,7 +10,7 @@ from variable_delay.src.dump_analyzer import DumpAnalyzer, MetadataError, Analys
 WORKING_DIR          = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_IN_DIR_NAME  = 'dumps'
 DEFAULT_IN_DIR_PATH  = os.path.join(WORKING_DIR, DEFAULT_IN_DIR_NAME)
-DEFAULT_OUT_DIR_NAME = 'graphs'
+DEFAULT_OUT_DIR_NAME = os.path.join('graphs', 'data')
 DEFAULT_OUT_DIR_PATH = os.path.join(WORKING_DIR, DEFAULT_OUT_DIR_NAME)
 EXIT_SUCCESS         = 0
 EXIT_FAILURE         = 1
@@ -24,7 +24,7 @@ FAILURE_MESSAGE      = "FAILURE"
 #
 def parse_arguments():
     parser = argparse.ArgumentParser(formatter_class=BlankLinesHelpFormatter, description=
-    'The script generates graphs and stats for pcap-files captured during testing.')
+    'The script extracts data from pcap-files captured during testing.')
 
     parser.add_argument('-d', '--dir', default=DEFAULT_IN_DIR_PATH,
                         help='folder with input pcap-files, default is "%s"' % DEFAULT_IN_DIR_NAME)
@@ -32,13 +32,7 @@ def parse_arguments():
     parser.add_argument('-o', '--output-dir', default=DEFAULT_OUT_DIR_PATH,
                         help='folder with output files, default is "%s"' % DEFAULT_OUT_DIR_NAME)
 
-    parser.add_argument('-i', '--interval', default=0.5, type=float,
-                        help='interval per which throughput is counted in seconds, default is 0.5')
-
     args = parser.parse_args()
-
-    if args.interval <= 0.0:
-        sys.exit('Interval should be positive')
 
     args.dir = os.path.realpath(os.path.expanduser(args.dir))
 
@@ -69,7 +63,7 @@ if __name__ == '__main__':
         print("Analysis of input dumps ERROR:\n%s" % error)
         exitCode = EXIT_FAILURE
     except DataError as error:
-        print("Output jsonl-data ERROR:\n%s" % error)
+        print("Output data ERROR:\n%s" % error)
         exitCode = EXIT_FAILURE
     except KeyboardInterrupt:
         print("KeyboardInterrupt was caught")

@@ -3,7 +3,7 @@
 from variable_delay.src import metadata_fields
 from variable_delay.src import layout_fields
 
-# general data kept in the first line
+# common data
 RUNTIME   = metadata_fields.RUNTIME
 ALL_FLOWS = metadata_fields.ALL_FLOWS
 
