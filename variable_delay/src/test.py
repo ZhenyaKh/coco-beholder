@@ -20,7 +20,7 @@ from variable_delay.third_party.mininet.net import Mininet
 from variable_delay.third_party.mininet.net import CLI
 
 from variable_delay.src.metadata import load_metadata, MetadataError
-from variable_delay.src.layout import LEFTWARD
+from variable_delay.src.layout import LEFTWARD, compute_per_flow
 from variable_delay.src.metadata_fields import *
 from variable_delay.src.layout_fields import *
 from variable_delay.src.pantheon_constants import *
@@ -83,9 +83,9 @@ class Test(object):
     # throws MetadataError
     #
     def __init__(self, user, dir, pantheon):
-        self.user      = user              # name of user who runs the testing
-        self.dir       = dir               # full path of output directory
-        self.pantheon  = pantheon          # full path to Pantheon directory
+        self.user      = user     # name of user who runs the testing
+        self.dir       = dir      # full path of output directory
+        self.pantheon  = pantheon # full path to Pantheon directory
 
         metadata = load_metadata(self.dir)
         self.baseUs          = metadata[BASE        ] # initial netem delay at central links
@@ -100,18 +100,19 @@ class Test(object):
         self.firstQueuePkts  = metadata[FIRST_QUEUE ] # size of transmit queue of left router
         self.secondQueuePkts = metadata[SECOND_QUEUE] # size of transmit queue of right router
         self.flows           = metadata[ALL_FLOWS   ] # total number of flows
+        self.check_flows_number_maximum()
 
-        layout = self.compute_per_flow_layout(metadata[SORTED_LAYOUT])
-        self.directions      = [ flow[DIRECTION   ] for flow in layout ] # per flow directions
-        self.leftDelaysUs    = [ flow[LEFT_DELAY  ] for flow in layout ] # per flow left delays
-        self.rightDelaysUs   = [ flow[RIGHT_DELAY ] for flow in layout ] # per flow right delays
-        self.leftRatesMbps   = [ flow[LEFT_RATE   ] for flow in layout ] # per flow left rates
-        self.rightRatesMbps  = [ flow[RIGHT_RATE  ] for flow in layout ] # per flow right rates
-        self.leftQueuesPkts  = [ flow[LEFT_QUEUES ] for flow in layout ] # per flow left queues
-        self.rightQueuesPkts = [ flow[RIGHT_QUEUES] for flow in layout ] # per flow right queues
-        self.runsFirst       = [ flow[RUNS_FIRST  ] for flow in layout ] # per flow who runs first
-        self.schemes         = [ flow[SCHEME      ] for flow in layout ] # per flow scheme names
-        self.schemePaths     = self.compute_schemes_paths()              # schemes' paths
+        layout = metadata[SORTED_LAYOUT]
+        self.directions      = compute_per_flow(DIRECTION,    layout) # per flow directions
+        self.leftDelaysUs    = compute_per_flow(LEFT_DELAY,   layout) # per flow left delays
+        self.rightDelaysUs   = compute_per_flow(RIGHT_DELAY,  layout) # per flow right delays
+        self.leftRatesMbps   = compute_per_flow(LEFT_RATE,    layout) # per flow left rates
+        self.rightRatesMbps  = compute_per_flow(RIGHT_RATE,   layout) # per flow right rates
+        self.leftQueuesPkts  = compute_per_flow(LEFT_QUEUES,  layout) # per flow left queues
+        self.rightQueuesPkts = compute_per_flow(RIGHT_QUEUES, layout) # per flow right queues
+        self.runsFirst       = compute_per_flow(RUNS_FIRST,   layout) # per flow who runs first
+        self.schemes         = compute_per_flow(SCHEME,       layout) # per flow scheme names
+        self.schemePaths     = self.compute_schemes_paths()           # schemes' paths
 
         self.network            = None # Mininet network
         self.leftRouter         = None # router interconnecting left hosts
@@ -127,9 +128,9 @@ class Test(object):
         self.clientPids         = []   # per flow pids of processes of launched clients
 
         # arrays of delta times and of corresponding delays -- to variate central link netem delay
-        self.deltasArraySec,     self.delaysArrayUs      = self.compute_delay_steps()
+        self.deltasArraySec,   self.delaysArrayUs      = self.compute_delay_steps()
         # per flow link to container keeping sender/receiver processes
-        self.senderPidHolders,   self.receiverPidHolders = self.compute_pid_holders()
+        self.senderPidHolders, self.receiverPidHolders = self.compute_pid_holders()
 
         self.startsSchedule = self.compute_starts_schedule(layout) # schedule of starting flows
         self.startEvent     = threading.Event()                    # sync with thread starting flows
@@ -177,28 +178,13 @@ class Test(object):
 
 
     #
-    # Method generates layout for each flow depending on number of flows in each entry of "layout"
-    # field of metadata.
-    # param [in] layout - metadata layout
+    # Method checks if the total number of flows does not exceed maximum
     # throws MetadataError
-    # returns per flow layout
     #
-    def compute_per_flow_layout(self, layout):
-        perFlowLayout = []
-
-        for entry in layout:
-            perFlowLayout.extend([entry] * entry[FLOWS])
-
-        # sanity check
-        if len(perFlowLayout) != self.flows:
-            raise MetadataError('Insanity: field "%s"=%d must be %d (sum of all "%s" in "%s")!!!' %
-                               (ALL_FLOWS, self.flows, len(perFlowLayout), FLOWS, SORTED_LAYOUT))
-
-        if len(perFlowLayout) > MAX_FLOWS_NUMBER:
+    def check_flows_number_maximum(self):
+        if self.flows > MAX_FLOWS_NUMBER:
             raise MetadataError('Flows number is %d but, with supernet %s, max flows number is %d' %
-                               (len(perFlowLayout), SUPERNET_ADDRESS, MAX_FLOWS_NUMBER))
-
-        return perFlowLayout
+                               (self.flows, SUPERNET_ADDRESS, MAX_FLOWS_NUMBER))
 
 
     #
@@ -263,22 +249,21 @@ class Test(object):
     #
     # Method generates schedule to start flows: intervals of sleeping and for each interval a list
     # of ids of flows to start after the sleep
-    # param [in] perFlowLayout - per flow layout sorted by flow's start
+    # param [in] layout - metadata layout
     # returns schedule to start flows
     #
-    def compute_starts_schedule(self, perFlowLayout):
-        startsSchedule = [[] for _ in range(perFlowLayout[-1][START] + 1)]
+    def compute_starts_schedule(self, layout):
+        starts = compute_per_flow(START, layout)
+
+        startsSchedule = [[] for _ in range(starts[-1] + 1)]
         previousStart  = 0
 
-        for flowId, flow in enumerate(perFlowLayout):
-            flowStart = flow[START]
+        for flowId, start in enumerate(starts):
+            startsSchedule[start].append(flowId)
 
-            startsSchedule[flowStart].append(flowId)
+            assert start >= previousStart
 
-            if flowStart < previousStart: # sanity check
-                raise MetadataError("Insanity: layout entries must be sorted by start field!!!")
-
-            previousStart = flowStart
+            previousStart = start
 
         return startsSchedule
 

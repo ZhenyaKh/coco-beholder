@@ -22,7 +22,22 @@ class LayoutError(Exception):
 
 
 #
-# Function creates default layout
+# Function generates array of per flow values of a chosen field of the layout.
+# param [in] field  - layout field
+# param [in] layout - the layout
+# returns array of per flow values of the field of the layout
+#
+def compute_per_flow(field, layout):
+    perFlowValues = []
+
+    for entry in layout:
+        perFlowValues.extend([entry[field]] * entry[FLOWS])
+
+    return perFlowValues
+
+
+#
+# Function creates default layout.
 # param [in] runtime - runtime of testing in seconds
 # param [in] rate    - rate in Mbps of the central link of the dumbbell topology
 # returns default layout

@@ -18,12 +18,12 @@ class MetadataError(Exception):
 
 
 #
-# Function generates metadata using processed arguments and parsed layout and saves it to json-file.
+# Function generates metadata using processed arguments and parsed layout.
 # param [in] processedArgs - processed arguments
 # param [in] parsedLayout  - parsed layout
-# throws MetadataError
+# returns metadata
 #
-def save_metadata(processedArgs, parsedLayout):
+def compute_metadata(processedArgs, parsedLayout):
     metadata =\
     {
         metadata_fields.RATE          : processedArgs[args_names.RATE        ],
@@ -41,17 +41,27 @@ def save_metadata(processedArgs, parsedLayout):
         metadata_fields.ALL_FLOWS     : sum(entry[FLOWS] for entry in parsedLayout)
     }
 
-    metadataPath = os.path.join(processedArgs[args_names.DIR], METADATA_NAME)
+    return metadata
+
+
+#
+# Function saves metadata to json-file.
+# param [in] directoryPath - full path of the output directory
+# param [in] metadata      - dictionary with metadata
+# throws MetadataError
+#
+def save_metadata(directoryPath, metadata):
+    metadataPath = os.path.join(directoryPath, METADATA_NAME)
 
     try:
         with open(metadataPath, 'w') as metadataFile:
             json.dump(metadata, metadataFile, sort_keys=True, indent=4, separators=(',', ': '))
     except Exception as error:
-        raise MetadataError("Failed to save meta: %s" % error)
+        raise MetadataError('Failed to save meta: %s' % error)
 
 
 #
-# Function loads metadata of the testing
+# Function loads metadata of the testing.
 # param [in] directoryPath - full path of the directory containing metadata file
 # throws MetadataError
 # returns dictionary with metadata
@@ -61,10 +71,17 @@ def load_metadata(directoryPath):
 
     try:
         with open(metadataPath) as metadataFile:
-            metadata = json.load(metadataFile)
+            metadata     = json.load(metadataFile)
+            layout       = metadata[metadata_fields.SORTED_LAYOUT]
+            sortedLayout = sorted(layout, key=lambda flow: flow[START])
+            layoutFlows  = sum(entry[FLOWS] for entry in layout)
+
+            assert sortedLayout == layout
+            assert layoutFlows  == metadata[metadata_fields.ALL_FLOWS]
+
     except IOError as error:
-        raise MetadataError("Failed to open meta: %s" % error)
+        raise MetadataError('Failed to open meta: %s' % error)
     except ValueError as error:
-        raise MetadataError("Failed to load meta: %s" % error)
+        raise MetadataError('Failed to load meta: %s' % error)
 
     return metadata

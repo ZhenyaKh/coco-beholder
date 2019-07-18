@@ -7,20 +7,19 @@ import hashlib
 from dpkt.pcap import Reader
 from dpkt.ethernet import Ethernet
 
-from variable_delay.src.metadata import load_metadata, MetadataError
+from variable_delay.src.metadata import load_metadata, save_metadata, MetadataError
 from variable_delay.src.metadata_fields import RUNTIME, ALL_FLOWS, SORTED_LAYOUT
 from variable_delay.src.layout_fields import FLOWS, DIRECTION, SCHEME
-from variable_delay.src.layout import RIGHTWARD
+from variable_delay.src.layout import RIGHTWARD, compute_per_flow
 from variable_delay.src.pantheon_constants import RECEIVER, SENDER
 from variable_delay.src.progress_bar import ProgressBar
-from variable_delay.src.data import save_data, DataError, WRITE_MODE, APPEND_MODE
+from variable_delay.src.data import save_data, DataError
 from variable_delay.src.data_fields import *
 
 MS_IN_SEC = 1000
 UTF8      = 'utf-8'
 PYTHON3   = 3
-DATA      = 'data'
-JSONL     = 'jsonl'
+
 
 #
 # Custom Exception class for errors connected to analysis of pcap-files
@@ -40,17 +39,16 @@ class DumpAnalyzer(object):
     # throws MetadataError
     #
     def __init__(self, inDir, outDir):
-        self.inDir    = inDir  # full path of input directory with dumps
-        self.outDir   = outDir # full path of output directory for extracted data
+        self.inDir  = inDir  # full path of input directory with dumps
+        self.outDir = outDir # full path of output directory for extracted data
 
-        metadata = load_metadata(self.inDir)
+        self.metadata   = load_metadata(self.inDir) # testing metadata
+        self.runtimeSec = self.metadata[RUNTIME  ]  # testing runtime
+        self.flows      = self.metadata[ALL_FLOWS]  # total number of flows
 
-        self.runtimeSec = metadata[RUNTIME  ] # testing runtime
-        self.flows      = metadata[ALL_FLOWS] # total number of flows
-
-        layout = metadata[SORTED_LAYOUT]
-        self.directions = self.compute_per_flow(DIRECTION, layout) # per flow directions
-        self.schemes    = self.compute_per_flow(SCHEME,    layout) # per flow scheme names
+        layout = self.metadata[SORTED_LAYOUT]
+        self.directions = compute_per_flow(DIRECTION, layout) # per flow directions
+        self.schemes    = compute_per_flow(SCHEME,    layout) # per flow scheme names
 
         self.senderDumps   = self.compute_dumps_paths(SENDER)   # per flow paths of sender dumps
         self.receiverDumps = self.compute_dumps_paths(RECEIVER) # per flow paths of receiver dumps
@@ -76,19 +74,19 @@ class DumpAnalyzer(object):
 
     #
     # Methods extracts data from pcap-files and saves it to the output directory
-    # throws AnalysisError, DataError
+    # throws AnalysisError, MetadataError, DataError
     #
     def extract_data(self):
         if sys.version_info[0] == PYTHON3:
             print("WARNING: You use python3 but for python2 analysis of dumps is ~1.3x faster.")
 
-        self.save_all_flows_data()
+        save_metadata(self.outDir, self.metadata)
+        self.metadata.clear()
 
         self.baseTime = self.get_base_time () # TODO: do not forget to check what if None
 
         for flow in range(0, self.flows):
-            # bold font in the terminal
-            print("\n\033[1m%s scheme, flow %d:\033[0m\n" % (self.schemes[flow], flow + 1))
+            print("\n\033[1m%s scheme, flow %d:\033[0m\n" % (self.schemes[flow], flow + 1)) # bold
 
             senderIp = self.get_sender_ip(flow)
             self.analyse_sender_dump  (flow, senderIp)
@@ -97,32 +95,13 @@ class DumpAnalyzer(object):
 
             self.departures[flow].clear()
 
-            self.save_flow_data(flow)
+            print("\nSaving the data of the flow to the file...\n")
+            save_data(self.outDir, flow, self.arrivals[flow], self.delays[flow], self.sizes[flow])
+            print("==========================================")
 
             del self.delays  [flow][:] # Immediately frees memory only for python3. For python2 even
             del self.sizes   [flow][:] # calling gc.collect() directly does not help. The only found
             del self.arrivals[flow][:] # comment: https://stackoverflow.com/a/35013905/4781940
-
-
-    #
-    # Method generates array of per flow values of a chosen field of the layout
-    # param [in] field  - layout field
-    # param [in] layout - metadata layout
-    # throws MetadataError
-    # returns array of per flow values of the field
-    #
-    def compute_per_flow(self, field, layout):
-        perFlowValues = []
-
-        for entry in layout:
-            perFlowValues.extend([entry[field]] * entry[FLOWS])
-
-        # sanity check
-        if len(perFlowValues) != self.flows:
-            raise MetadataError('Insanity: field "%s"=%d must be %d (sum of all "%s" in "%s")!!!' %
-                               (ALL_FLOWS, self.flows, len(perFlowValues), FLOWS, SORTED_LAYOUT))
-
-        return perFlowValues
 
 
     #
@@ -137,18 +116,6 @@ class DumpAnalyzer(object):
             paths.append(os.path.join(self.inDir, "{:d}-{}-{}.pcap".format(flow, scheme, role)))
 
         return paths
-
-
-    #
-    # Method saves data common for all the flows
-    # throws DataError
-    #
-    def save_all_flows_data(self):
-        data = { RUNTIME : self.runtimeSec, ALL_FLOWS : self.flows }
-
-        filePath = os.path.join(self.outDir, "{}.{}".format(DATA, JSONL))
-
-        save_data(filePath, data, WRITE_MODE)
 
 
     #
@@ -308,22 +275,6 @@ class DumpAnalyzer(object):
         if self.allSentBytes[flow] != 0:
             print((u"\u2660 Loss (ratio of \u2663 bytes to \u2665 bytes)              : %.3f%%" %
                    (float(self.lostSentBytes[flow]) / self.allSentBytes[flow] * 100)))
-
-
-    #
-    # Method saves data for a particular flow
-    # param [in] flow - flow index
-    # throws DataError
-    #
-    def save_flow_data(self, flow):
-        filePath = os.path.join(self.outDir, "{}-{:d}.{}".format(DATA, flow + 1, JSONL))
-
-        save_data(filePath, { SCHEME    : self.schemes   [flow],
-                              DIRECTION : self.directions[flow] }, WRITE_MODE)
-
-        save_data(filePath, { ARRIVALS  : self.arrivals  [flow] }, APPEND_MODE)
-        save_data(filePath, { DELAYS    : self.delays    [flow] }, APPEND_MODE)
-        save_data(filePath, { SIZES     : self.sizes     [flow] }, APPEND_MODE)
 
 
     #

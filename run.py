@@ -8,7 +8,7 @@ import pwd
 
 from variable_delay.src.help_formatter import BlankLinesHelpFormatter
 from variable_delay.src.test import test
-from variable_delay.src.metadata import save_metadata, MetadataError
+from variable_delay.src.metadata import compute_metadata, save_metadata, MetadataError
 from variable_delay.src.layout import parse_layout, save_default_layout, parse_time_str, LayoutError
 from variable_delay.src.args_names import *
 
@@ -282,9 +282,10 @@ if __name__ == '__main__':
     os.seteuid(pwd.getpwnam(user).pw_uid) # drop root privileges
 
     try:
-        args   = process_arguments(args)
-        layout = parse_layout(args[LAYOUT_PATH], args[RUNTIME], args[PANTHEON], args[MAX_DELAY])
-        save_metadata(args, layout)
+        args     = process_arguments(args)
+        layout   = parse_layout(args[LAYOUT_PATH], args[RUNTIME], args[PANTHEON], args[MAX_DELAY])
+        metadata = compute_metadata(args, layout)
+        save_metadata(args[DIR], metadata)
     except ArgsError as error:
         print("Arguments processing ERROR:\n%s" % error)
         sys.exit(1)

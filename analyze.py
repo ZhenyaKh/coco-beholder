@@ -57,7 +57,7 @@ if __name__ == '__main__':
     try:
         DumpAnalyzer(args.dir, args.output_dir).extract_data()
     except MetadataError as error:
-        print("Input metadata ERROR:\n%s" % error)
+        print("Metadata ERROR:\n%s" % error)
         exitCode = EXIT_FAILURE
     except AnalysisError as error:
         print("Analysis of input dumps ERROR:\n%s" % error)

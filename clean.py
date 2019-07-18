@@ -10,7 +10,6 @@ SENDER                  = 'sender'
 RECEIVER                = 'receiver'
 PCAP                    = '.pcap'
 JSON                    = '.json'
-JSONL                   = '.jsonl'
 PNG                     = '.png'
 LOG                     = '.log'
 WORKING_DIR             = os.path.dirname(os.path.realpath(__file__))
@@ -23,8 +22,8 @@ DEFAULT_GRAPHS_PATH     = os.path.join(WORKING_DIR, DEFAULT_GRAPHS_DIR_NAME)
 
 
 parser = argparse.ArgumentParser(formatter_class=BlankLinesHelpFormatter, description=
-'The script cleans three output directories. The script deletes only pcap/json/jsonl/png/log files '
-'and does not touch any subdirectories. If any of the chosen directories gets completely empty the '
+'The script cleans three output directories. The script deletes only pcap/json/png/log files and '
+'does not touch any subdirectories. If any of the chosen directories gets completely empty the '
 'script also deletes the directory.')
 
 parser.add_argument('-a', '--all', action='store_true',
@@ -97,8 +96,8 @@ for directory in directories:
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
     for file in files:
-        if not file.endswith(PCAP) and not file.endswith(JSON)  and not file.endswith(PNG)\
-                                   and not file.endswith(JSONL) and not file.endswith(LOG):
+        if not file.endswith(PCAP) and not file.endswith(JSON) and not file.endswith(PNG)\
+                                                               and not file.endswith(LOG):
             continue
 
         if SENDER in file:
