@@ -78,7 +78,7 @@ def add_arguments(parser):
          .format(PerSubsetPlot.ALLOWED_FIELDS))
 
     parser.add_argument('-i', '--interval', default=0.5, type=float, metavar='SEC',
-    help='Interval per which average graphs are counted in seconds, default is 0.5')
+    help='Interval per which average graphs are computed in seconds, default is 0.5')
 
 
 #
