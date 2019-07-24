@@ -52,7 +52,7 @@ def save_data(directory, flow, arrivals, delays, sizes):
 # throws DataError
 #
 def get_data_duration(directory, flow):
-    filePath = os.path.join(directory, "{}-{:d}.{}".format(DATA, flow + 1, LOG))
+    filePath = os.path.join(directory, "{}-{:d}.{}".format(DATA, flow, LOG))
 
     try:
         with open(filePath, 'r') as file:
@@ -73,7 +73,7 @@ def get_data_duration(directory, flow):
 # throws DataError
 #
 def load_data(directory, flow):
-    filePath = os.path.join(directory, "{}-{:d}.{}".format(DATA, flow + 1, LOG))
+    filePath = os.path.join(directory, "{}-{:d}.{}".format(DATA, flow, LOG))
 
     try:
         with open(filePath, 'r') as file:

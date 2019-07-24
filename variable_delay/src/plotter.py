@@ -10,7 +10,8 @@ import matplotlib.ticker as plticker
 
 from variable_delay.src.metadata import load_metadata, MetadataError
 from variable_delay.src.metadata_fields import ALL_FLOWS
-from variable_delay.src.data import load_data, get_data_duration, DataError
+from variable_delay.src.data import DataError
+from variable_delay.src.flow import Flow
 
 BITS_IN_BYTE     = 8
 BITS_IN_MBITS    = 1000000
@@ -49,16 +50,12 @@ class Plotter(object):
 
         self.curves, self.labels = self.type.get_curves(metadata)
 
-        self.flows       = metadata[ALL_FLOWS] # total number of flows
-        self.starts      = [None] *self.flows  # per flow timestamps of first arrivals
-        self.ends        = [None] *self.flows  # per flow timestamps of last arrivals
-        self.slotsNumber = None                # number of slots
+        flowsNumber      = metadata[ALL_FLOWS]
+        self.flows       = [ Flow() for _ in range(flowsNumber) ] # flows
+        self.slotsNumber = None                                   # number of slots
 
         # TODO: empty flows!
 
-        self.flowSlottedPkts    = None # per flow number of packets divided into slots
-        self.flowSlottedDelays  = None # per flow sum of delays of all the packets in the slot
-        self.flowSlottedBytes   = None # per flow number of packets' bytes divided into slots
         #self.curveSlottedPkts   = None # per curve number of packets divided into slots
         #self.curveSlottedDelays = None # per curve sum of delays of all the packets in the slot
         self.curveSlottedBytes  = None # per curve number of packets' bytes divided into slots
@@ -96,7 +93,7 @@ class Plotter(object):
     #
     #
     def plot_average(self):
-        self.get_flows_durations()
+        self.compute_flows_time_bounds()
 
         self.compute_slots_number()
 
@@ -104,23 +101,19 @@ class Plotter(object):
 
         self.compute_slotted_curve_data()
 
-        del self.flowSlottedPkts  [:]
-        del self.flowSlottedDelays[:]
-        del self.flowSlottedBytes [:]
+        self.free_flows_data()
 
         self.compute_curve_stats()
 
         self.plot_average_rate()
 
 
-
-
     #
-    # Methods gets start and end timestamps for each flow
+    # Methods computes start and end timestamps for each flow
     #
-    def get_flows_durations(self):
-        for flow in range(0, self.flows):
-            self.starts[flow], self.ends[flow] = get_data_duration(self.inDir, flow)
+    def compute_flows_time_bounds(self):
+        for flowId, flow in enumerate(self.flows):
+            flow.compute_time_bounds(self.inDir, flowId + 1)
 
 
     #
@@ -129,38 +122,25 @@ class Plotter(object):
     def compute_slots_number(self):
         maxEnd = None
 
-        for end in self.ends:
-            if end is not None:
+        for flow in self.flows:
+            if flow.end is not None:
                 if maxEnd is None:
-                    maxEnd = end
+                    maxEnd = flow.end
                 else:
-                    maxEnd = max(end, maxEnd)
+                    maxEnd = max(flow.end, maxEnd)
 
         if maxEnd is None:
             self.slotsNumber = int(0)
         else:
-            self.slotsNumber = int(math.ceil(max(self.ends) / self.slotSec))
+            self.slotsNumber = int(math.ceil(maxEnd / self.slotSec))
 
 
     #
     # Method computes slotted data for each flow
     #
     def compute_slotted_flow_data(self):
-        self.flowSlottedPkts   = [None] * self.flows
-        self.flowSlottedDelays = [None] * self.flows
-        self.flowSlottedBytes  = [None] * self.flows
-
-        for flow in range(0, self.flows):
-            arrivals, delays, sizes = load_data(self.inDir, flow)
-
-            self.compute_slotted_packets(arrivals, flow)
-            del arrivals[:]
-
-            self.compute_slotted_delays(delays, flow)
-            del delays[:]
-
-            self.compute_slotted_bytes(sizes, flow)
-            del sizes[:]
+        for flowId, flow in enumerate(self.flows):
+            flow.compute_slotted_data(self.inDir, flowId + 1, self.slotsNumber, self.slotSec)
 
 
     #
@@ -172,8 +152,15 @@ class Plotter(object):
         self.curveSlottedBytes  = [None] * len(self.curves)
 
         for index, curve in enumerate(self.curves):
-            self.curveSlottedBytes[index] = self.merge_slotted_data(curve, self.flowSlottedBytes)
+            self.curveSlottedBytes[index] = self.merge_slotted_data(curve)
 
+
+    #
+    # Method frees the data of all the flows
+    #
+    def free_flows_data(self):
+        for flow in self.flows:
+            flow.free_data()
 
 
     #
@@ -226,77 +213,17 @@ class Plotter(object):
         plt.close(figure)
 
 
-    #
-    # Methods divides packets of a flow into time slots
-    # param [in] arrivals - timestamps of packets' arrivals
-    # param [in] flow     - flow index
-    #
-    def compute_slotted_packets(self, arrivals, flow):
-        flowSlottedPkts = [0] * self.slotsNumber
-
-        for arrival in arrivals:
-            slotId = int(arrival / self.slotSec)
-
-            flowSlottedPkts[slotId] += 1
-
-        self.flowSlottedPkts[flow] = flowSlottedPkts
-
-
-    #
-    # Methods computed sums of delays of packets placed in one slot
-    # param [in] delays - packets' delays
-    # param [in] flow   - flow index
-    #
-    def compute_slotted_delays(self, delays, flow):
-        flowSlottedDelays = [0] * self.slotsNumber
-
-        firstPacket = 0
-
-        for slotId, packets in enumerate(self.flowSlottedPkts[flow]):
-            delaySum = 0.0
-
-            for packet in range(firstPacket, firstPacket + packets):
-                delaySum += delays[packet]
-
-            firstPacket += packets
-
-            flowSlottedDelays[slotId] = delaySum
-
-        self.flowSlottedDelays[flow] = flowSlottedDelays
-
-
-    #
-    # Methods computed sums of bytes of packets placed in one slot
-    # param [in] sizes - packets' sizes in bytes
-    # param [in] flow  - flow index
-    #
-    def compute_slotted_bytes(self, sizes, flow):
-        flowSlottedBytes = [0] * self.slotsNumber
-
-        firstPacket = 0
-
-        for slotId, packets in enumerate(self.flowSlottedPkts[flow]):
-            bytesSum = 0
-
-            for packet in range(firstPacket, firstPacket + packets):
-                bytesSum += sizes[packet]
-
-            firstPacket += packets
-
-            flowSlottedBytes[slotId] = bytesSum
-
-        self.flowSlottedBytes[flow] = flowSlottedBytes
 
 
     #
     #
     #
-    def merge_slotted_data(self, curve, perFlowData):
+    def merge_slotted_data(self, curve):
         mergedData = [0] * self.slotsNumber
 
         for slotId in range(0, self.slotsNumber):
             for flow in curve:
-                mergedData[slotId] += perFlowData[flow][slotId]
+                mergedData[slotId] += self.flows[flow].slottedBytes[slotId]
 
         return mergedData
 
@@ -309,17 +236,17 @@ class Plotter(object):
         maxEnd   = None
 
         for flow in curve:
-            if self.starts[flow] is not None:
+            if self.flows[flow].start is not None:
                 if minStart is None:
-                    minStart = self.starts[flow]
+                    minStart = self.flows[flow].start
                 else:
-                    minStart = min(minStart, self.starts[flow])
+                    minStart = min(minStart, self.flows[flow].start)
 
-            if self.ends[flow] is not None:
+            if self.flows[flow].end is not None:
                 if maxEnd is None:
-                    maxEnd = self.ends[flow]
+                    maxEnd = self.flows[flow].end
                 else:
-                    maxEnd = max(maxEnd, self.ends[flow])
+                    maxEnd = max(maxEnd, self.flows[flow].end)
 
         if minStart is None:
             assert maxEnd is None
