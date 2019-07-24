@@ -15,6 +15,7 @@ class PlotType(object):
     # Constructor
     #
     def __init__(self):
+        self.name = None # name of the type of plots/stats
         pass
 
 
@@ -25,3 +26,11 @@ class PlotType(object):
     #
     def get_curves(self, metadata):
         raise NotImplementedError
+
+
+    #
+    # Method returns prefix for names of plots and stats of the type.
+    # returns filename prefix
+    #
+    def get_filename_prefix(self):
+        return self.name

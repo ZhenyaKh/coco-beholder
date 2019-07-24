@@ -16,6 +16,7 @@ class TotalPlot(PlotType):
     #
     def __init__(self):
         PlotType.__init__(self)
+        self.name = 'total' # name of the type of plots/stats
 
 
     #
@@ -27,7 +28,7 @@ class TotalPlot(PlotType):
         flowsNumber = metadata[ALL_FLOWS]
         flowsWord   = FLOW if flowsNumber == 1 else FLOWS
 
-        flows = list(range(0, flowsNumber))
+        flows = [ list(range(0, flowsNumber)) ]
         names = [ 'Total: {:d} {}'.format(flowsNumber, flowsWord) ]
 
         return flows, names

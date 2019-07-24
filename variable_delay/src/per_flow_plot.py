@@ -14,6 +14,7 @@ class PerFlowPlot(PlotType):
     #
     def __init__(self):
         PlotType.__init__(self)
+        self.name = 'per-flow' # name of the type of plots/stats
 
 
     #

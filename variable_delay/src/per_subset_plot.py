@@ -32,7 +32,8 @@ class PerSubsetPlot(PlotType):
                 raise PlotTypeError('This is not a layout field allowed: \'%s\'\n'
                                     'Allowed fields: %s'% (field, PerSubsetPlot.ALLOWED_FIELDS))
 
-        self.fields = fields
+        self.fields = fields                         # layout fields to divide flows
+        self.name   = 'per-' + '-'.join(self.fields) # name of the type of plots/stats
 
 
     #
@@ -62,12 +63,11 @@ class PerSubsetPlot(PlotType):
         names = []
 
         for tuple in curves:
-            curveName    = tuple[0]
-            flowsList    = tuple[1]
-            flowsListStr = ", ".join([ str(flow + 1) for flow in flowsList ])
-            flowsWord    = FLOW if len(flowsList) == 1 else FLOWS
+            curveName = tuple[0]
+            flowsList = tuple[1]
+            flowsWord = FLOW if len(flowsList) == 1 else FLOWS
 
-            names.append("{} : {} {}".format(curveName, flowsWord, flowsListStr))
+            names.append("{} : {:d} {}".format(curveName, len(flowsList), flowsWord))
             flows.append(flowsList)
 
         return flows, names

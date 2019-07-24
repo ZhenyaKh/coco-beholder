@@ -48,6 +48,7 @@ TIMEOUT_SEC         = 5.0
 BRIDGE              = 'br0'
 PID                 = 'PID'
 DEFAULT_QUEUE_SIZE  = 1000
+UTF8                = 'utf-8'
 
 
 #
@@ -342,7 +343,7 @@ class Test(object):
 
             if popen.returncode != 0:
                 print('WARNING: For %s, setup_after_reboot exited with code %d and message:\n%s' %
-                     (scheme, popen.returncode, error))
+                     (scheme, popen.returncode, error.decode(UTF8)))
 
 
     #
@@ -647,7 +648,7 @@ class Test(object):
 
         if popen.returncode != 0:
             raise TestError("This command failed with exit code %d:\n%s\nError message:\n%s"%
-                           (popen.returncode, command, error))
+                           (popen.returncode, command, error.decode(UTF8)))
 
         return output
 
@@ -704,7 +705,7 @@ class Test(object):
                 result = re.search(b'(\d+) packets dropped', output)
 
                 if result is None:
-                    raise TestError("Tcpdump failed with message:\n%s" % output)
+                    raise TestError("Tcpdump failed with message:\n%s" % output.decode(UTF8))
 
                 droppedPackets += int(result.group(1))
 
