@@ -8,8 +8,10 @@ from variable_delay.src.data import get_data_duration, load_data, DataError
 class Flow(object):
     #
     # Constructor
+    # param [in] id - flow index
     #
-    def __init__(self):
+    def __init__(self, id):
+        self.id            = id   # flow index
         self.start         = None # flow start
         self.end           = None # flow end
         self.slottedPkts   = None # flow slotted packets
@@ -20,23 +22,21 @@ class Flow(object):
     #
     # Method computes the flow's data first and last arrivals.
     # param [in] directory - input directory containing the log file
-    # param [in] flowId    - flow index
     # throws DataError
     #
-    def compute_time_bounds(self, directory, flowId):
-        self.start, self.end = get_data_duration(directory, flowId)
+    def compute_time_bounds(self, directory):
+        self.start, self.end = get_data_duration(directory, self.id + 1)
 
 
     #
     # Method computes slotted data for the flow
     # param [in] directory   - input directory containing the log file
-    # param [in] flowId      - flow index
     # param [in] slotsNumber - number of slots
     # param [in] slotSec     - float slot size in seconds
     # throws DataError
     #
-    def compute_slotted_data(self, directory, flowId, slotsNumber, slotSec):
-        arrivals, delays, sizes = load_data(directory, flowId)
+    def compute_slotted_data(self, directory, slotsNumber, slotSec):
+        arrivals, delays, sizes = load_data(directory, self.id + 1)
 
         self.compute_slotted_packets(arrivals, slotsNumber, slotSec)
         del arrivals[:]

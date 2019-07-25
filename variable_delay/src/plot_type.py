@@ -21,10 +21,11 @@ class PlotType(object):
 
     #
     # Method generates curves: flows merged into each curve and name of each curve.
-    # param [in] metadata - metadata of flows
-    # returns array of arrays of flows per curve, array of names of curves
+    # param [in] layout - layout of flows
+    # param [in] flows  - flows to divide into curves
+    # returns curves
     #
-    def get_curves(self, metadata):
+    def get_curves(self, layout, flows):
         raise NotImplementedError
 
 

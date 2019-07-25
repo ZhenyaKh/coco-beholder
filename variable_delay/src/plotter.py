@@ -9,12 +9,10 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
 
 from variable_delay.src.metadata import load_metadata, MetadataError
-from variable_delay.src.metadata_fields import ALL_FLOWS
+from variable_delay.src.metadata_fields import ALL_FLOWS, SORTED_LAYOUT
 from variable_delay.src.data import DataError
 from variable_delay.src.flow import Flow
 
-BITS_IN_BYTE     = 8
-BITS_IN_MBITS    = 1000000
 AVERAGE_RATE     = 'avg-rate'
 AVERAGE_FAIRNESS = 'avg-jain'
 AVERAGE_DELAY    = 'avg-delay'
@@ -43,23 +41,16 @@ class Plotter(object):
         self.outDir  = outDir          # full path of output directory for graphs and stats
         self.slotSec = float(interval) # interval in seconds per which average graphs are averaged
         self.type    = type            # type of graphs and stats to make
-        self.curves  = None            # list of lists of flows merged into a curve
-        self.labels  = None            # list of names of the curves
 
         metadata = load_metadata(self.inDir)
 
-        self.curves, self.labels = self.type.get_curves(metadata)
-
         flowsNumber      = metadata[ALL_FLOWS]
-        self.flows       = [ Flow() for _ in range(flowsNumber) ] # flows
-        self.slotsNumber = None                                   # number of slots
+        self.flows       = [ Flow(i) for i in range(flowsNumber) ] # flows
+        self.slotsNumber = None                                    # number of slots
+
+        self.curves = self.type.get_curves(metadata[SORTED_LAYOUT], self.flows) # curves
 
         # TODO: empty flows!
-
-        #self.curveSlottedPkts   = None # per curve number of packets divided into slots
-        #self.curveSlottedDelays = None # per curve sum of delays of all the packets in the slot
-        self.curveSlottedBytes  = None # per curve number of packets' bytes divided into slots
-        self.curveAvgRate       = None
 
         # full paths of output graphs and stats
         self.avgRatePath  = self.get_output_file_name(AVERAGE_RATE,     PLOTS_EXTENSION)
@@ -69,17 +60,15 @@ class Plotter(object):
         self.statsPath    = self.get_output_file_name(STATISTICS,       STATS_EXTENSION)
 
 
-
     #
     # Method generates plots and stats over data extracted from pcap-files.
-    # throws MetadataError
     #
     def generate(self):
         self.plot_average()
 
 
     #
-    #
+    # Method computes the full paths of the graphs
     #
     def get_output_file_name(self, filenameRoot, extension):
         filename = '{}-{}.{}'.format(self.type.get_filename_prefix(), filenameRoot, extension)
@@ -90,7 +79,8 @@ class Plotter(object):
 
 
     #
-    #
+    # Method slotted graphs: average rate, averaga Jain index, average one-way delay
+    # throws DataError
     #
     def plot_average(self):
         self.compute_flows_time_bounds()
@@ -110,10 +100,11 @@ class Plotter(object):
 
     #
     # Methods computes start and end timestamps for each flow
+    # throws DataError
     #
     def compute_flows_time_bounds(self):
         for flowId, flow in enumerate(self.flows):
-            flow.compute_time_bounds(self.inDir, flowId + 1)
+            flow.compute_time_bounds(self.inDir)
 
 
     #
@@ -137,22 +128,19 @@ class Plotter(object):
 
     #
     # Method computes slotted data for each flow
+    # throws DataError
     #
     def compute_slotted_flow_data(self):
         for flowId, flow in enumerate(self.flows):
-            flow.compute_slotted_data(self.inDir, flowId + 1, self.slotsNumber, self.slotSec)
+            flow.compute_slotted_data(self.inDir, self.slotsNumber, self.slotSec)
 
 
     #
     # Method computes slotted data for each curve
     #
     def compute_slotted_curve_data(self):
-        #self.curveSlottedPkts   = [None] * len(self.curves)
-        #self.curveSlottedDelays = [None] * len(self.curves)
-        self.curveSlottedBytes  = [None] * len(self.curves)
-
-        for index, curve in enumerate(self.curves):
-            self.curveSlottedBytes[index] = self.merge_slotted_data(curve)
+        for curve in self.curves:
+            curve.merge_flows_slotted_data()
 
 
     #
@@ -164,39 +152,28 @@ class Plotter(object):
 
 
     #
-    #
+    # Method computes statistics values for each curve
     #
     def compute_curve_stats(self):
-        self.curveAvgRate = [None] * len(self.curves)
-
-        for curveId in range(0, len(self.curves)):
-            sumCurveBytes = sum(self.curveSlottedBytes[curveId])
-            curveDuration = self.compute_curve_duration(self.curves[curveId])
-
-            if curveDuration is not None and curveDuration != 0.0:
-                avgRate = (sumCurveBytes * BITS_IN_BYTE) / (curveDuration * BITS_IN_MBITS)
-                self.curveAvgRate[curveId] = avgRate
-
-
-        print('!', self.curveAvgRate)
+        for curve in self.curves:
+            curve.compute_stats()
 
 
     #
-    #
+    # Method plots average rate of curves
     #
     def plot_average_rate(self):
         figure, ax = plt.subplots(figsize=(16, 9))
-        lineMarker = self.get_line_plot_marker()
 
-        for index, curve in enumerate(self.curves):
-            xData, yData = self.get_rate_curve_data(index)
-            ax.plot(xData, yData, marker=lineMarker, label=self.make_curve_avg_rate_label(index))
+        for curve in self.curves:
+            xData, yData = curve.get_rate_data(self.slotSec)
+            ax.plot(xData, yData, marker=self.get_line_plot_marker(), label=curve.avg_rate_label())
 
         ax.ticklabel_format(useOffset=False, style='plain') # turn off scientific notation
         locator = plticker.MultipleLocator(base=1)          # enforce tick for each second on x axis
         ax.xaxis.set_major_locator(locator)
 
-        ax.set_xlim(self.get_x_limit())
+        ax.set_xlim(self.get_slotted_graph_x_limit())
         ax.set_xlabel('Time (s), interval %gs' % self.slotSec, fontsize=FONT_SIZE)
         ax.set_ylabel('Throughput (Mbit/s)',                   fontsize=FONT_SIZE)
         ax.grid()
@@ -213,89 +190,10 @@ class Plotter(object):
         plt.close(figure)
 
 
-
-
     #
+    # Method finds x limit for the graphs of the slotted data
     #
-    #
-    def merge_slotted_data(self, curve):
-        mergedData = [0] * self.slotsNumber
-
-        for slotId in range(0, self.slotsNumber):
-            for flow in curve:
-                mergedData[slotId] += self.flows[flow].slottedBytes[slotId]
-
-        return mergedData
-
-
-    #
-    #
-    #
-    def compute_curve_duration(self, curve):
-        minStart = None
-        maxEnd   = None
-
-        for flow in curve:
-            if self.flows[flow].start is not None:
-                if minStart is None:
-                    minStart = self.flows[flow].start
-                else:
-                    minStart = min(minStart, self.flows[flow].start)
-
-            if self.flows[flow].end is not None:
-                if maxEnd is None:
-                    maxEnd = self.flows[flow].end
-                else:
-                    maxEnd = max(maxEnd, self.flows[flow].end)
-
-        if minStart is None:
-            assert maxEnd is None
-            duration = None
-        else:
-            duration = maxEnd - minStart
-
-        return duration
-
-
-    #
-    #
-    #
-    def get_rate_curve_data(self, curveId):
-        xData = []
-        yData = []
-
-        for slotId in range(0, self.slotsNumber):
-            yValue = self.curveSlottedBytes[curveId][slotId] * BITS_IN_BYTE
-            yValue = yValue / (self.slotSec * BITS_IN_MBITS)
-
-            if yValue == 0.0 and len(yData) == 0:
-                continue # cut off front slots with zeroes
-
-            yData.append(yValue)
-            xData.append(self.slotSec * slotId)
-
-        print("ydata", yData)
-        return xData, yData
-
-
-    #
-    #
-    #
-    def make_curve_avg_rate_label(self, curveId):
-        if self.curveAvgRate[curveId] is None:
-            valueStr = 'no packets'
-        else:
-            valueStr = '{:.2f} Mbps'.format(self.curveAvgRate[curveId])
-
-        return '{} ({})'.format(self.labels[curveId], valueStr)
-
-
-
-
-    #
-    #
-    #
-    def get_x_limit(self):
+    def get_slotted_graph_x_limit(self):
         if self.slotsNumber == 0 or self.slotsNumber == 1:
             minLimit = -1
             maxLimit = 1
@@ -309,7 +207,8 @@ class Plotter(object):
 
 
     #
-    #
+    # Method finds marker for line graphs
+    # returns the marker
     #
     def get_line_plot_marker(self):
         if self.slotsNumber <= 1:

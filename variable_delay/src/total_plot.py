@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from variable_delay.src.plot_type import PlotType
-from variable_delay.src.metadata_fields import ALL_FLOWS
+from variable_delay.src.curve import Curve
 
 FLOW  = 'flow'
 FLOWS = 'flows'
@@ -21,14 +21,14 @@ class TotalPlot(PlotType):
 
     #
     # Method generates curves: flows merged into each curve and name of each curve.
-    # param [in] metadata - metadata of flows
-    # returns array of arrays of flows per curve, array of names of curves
+    # param [in] layout - layout of flows
+    # param [in] flows  - flows to divide into curves
+    # returns curves
     #
-    def get_curves(self, metadata):
-        flowsNumber = metadata[ALL_FLOWS]
-        flowsWord   = FLOW if flowsNumber == 1 else FLOWS
+    def get_curves(self, layout, flows):
+        flowsWord = FLOW if len(flows) == 1 else FLOWS
 
-        flows = [ list(range(0, flowsNumber)) ]
-        names = [ 'Total: {:d} {}'.format(flowsNumber, flowsWord) ]
+        name      = 'Total: {:d} {}'.format(len(flows), flowsWord)
+        flowsList = flows
 
-        return flows, names
+        return [ Curve(flowsList, name) ]

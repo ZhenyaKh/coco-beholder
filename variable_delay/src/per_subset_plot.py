@@ -3,7 +3,7 @@
 from variable_delay.src.plot_type import PlotType, PlotTypeError
 from variable_delay.src.layout_fields import SCHEME, DIRECTION
 from variable_delay.src.layout import compute_per_flow
-from variable_delay.src.metadata_fields import ALL_FLOWS, SORTED_LAYOUT
+from variable_delay.src.curve import Curve
 
 FLOW  = 'flow'
 FLOWS = 'flows'
@@ -38,39 +38,38 @@ class PerSubsetPlot(PlotType):
 
     #
     # Method generates curves: list of flows merged into each curve and name of each curve.
-    # param [in] metadata - metadata of flows
-    # returns array of arrays of flow indices per curve, array of names of curves
+    # param [in] layout - layout of flows
+    # param [in] flows  - flows to divide into curves
+    # returns curves
     #
-    def get_curves(self, metadata):
-        layout = metadata[SORTED_LAYOUT]
+    def get_curves(self, layout, flows):
         values = [ compute_per_flow(field, layout) for field in self.fields ]
         curves = { }
 
-        for flow in range(0, metadata[ALL_FLOWS]):
+        for flowId, flow in enumerate(flows):
             curveName = []
 
             for index, fieldValues in enumerate(values):
-                value = self.layout_value_to_str(fieldValues[flow], self.fields[index])
+                value = self.layout_value_to_str(fieldValues[flowId], self.fields[index])
                 curveName.append(value)
 
             curveName = ' '.join(curveName)
 
             curves.setdefault(curveName, []).append(flow)
 
-        curves = sorted(curves.items(), key=lambda item: item[1][0]) # sort by the first flow index
+        curves = sorted(curves.items(), key=lambda item: item[1][0].id) # sort by the first flow id
 
-        flows = []
-        names = []
+        curvesArray = []
 
         for tuple in curves:
             curveName = tuple[0]
             flowsList = tuple[1]
             flowsWord = FLOW if len(flowsList) == 1 else FLOWS
+            name      = '{} : {:d} {}'.format(curveName, len(flowsList), flowsWord)
 
-            names.append("{} : {:d} {}".format(curveName, len(flowsList), flowsWord))
-            flows.append(flowsList)
+            curvesArray.append(Curve(flowsList, name))
 
-        return flows, names
+        return curvesArray
 
 
     #

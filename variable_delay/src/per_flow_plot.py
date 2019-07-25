@@ -3,7 +3,7 @@
 from variable_delay.src.plot_type import PlotType
 from variable_delay.src.layout import compute_per_flow
 from variable_delay.src.layout_fields import SCHEME, DIRECTION
-from variable_delay.src.metadata_fields import ALL_FLOWS, SORTED_LAYOUT
+from variable_delay.src.curve import Curve
 
 #
 # Class of per-flow plots/stats
@@ -19,17 +19,21 @@ class PerFlowPlot(PlotType):
 
     #
     # Method generates curves: flows merged into each curve and name of each curve.
-    # param [in] metadata - metadata of flows
-    # returns array of arrays of flows per curve, array of names of curves
+    # param [in] layout - layout of flows
+    # param [in] flows  - flows to divide into curves
+    # returns curves
     #
-    def get_curves(self, metadata):
-        flows  = range(0, metadata[ALL_FLOWS])
-        layout = metadata[SORTED_LAYOUT]
-
+    def get_curves(self, layout, flows):
         schemes    = compute_per_flow(SCHEME,    layout)
         directions = compute_per_flow(DIRECTION, layout)
+        template   = 'Flow {:d}: {} {}'
 
-        names = [ 'Flow {:d}: {} {}'.format(i + 1, schemes[i], directions[i]) for i in flows ]
-        flows = [ [i] for i in flows ]
+        curves = []
 
-        return flows, names
+        for flow in flows:
+            name      = template.format(flow.id + 1, schemes[flow.id], directions[flow.id])
+            flowsList = [ flow ]
+
+            curves.append(Curve(flowsList, name))
+
+        return curves
