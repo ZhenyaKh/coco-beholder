@@ -765,7 +765,7 @@ def test(user, dir, pantheon):
     try:
         test = Test(user, dir, pantheon)
         test.test()
-        CLI(test.network)
+        # CLI(test.network)
     except MetadataError as error:
         print("Metadata ERROR:\n%s" % error)
         exitCode = EXIT_FAILURE

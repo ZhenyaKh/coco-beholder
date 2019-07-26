@@ -47,6 +47,7 @@ class Plotter(object):
         flowsNumber      = metadata[ALL_FLOWS]
         self.flows       = [ Flow(i) for i in range(flowsNumber) ] # flows
         self.slotsNumber = None                                    # number of slots
+        self.avgJain     = None                                    # average Jain index stats
 
         self.curves = self.type.get_curves(metadata[SORTED_LAYOUT], self.flows) # curves
 
@@ -96,6 +97,10 @@ class Plotter(object):
         self.compute_curve_stats()
 
         self.plot_average_rate()
+
+        self.plot_average_delay()
+
+        self.plot_average_jain_index()
 
 
     #
@@ -166,8 +171,8 @@ class Plotter(object):
         figure, ax = plt.subplots(figsize=(16, 9))
 
         for curve in self.curves:
-            xData, yData = curve.get_rate_data(self.slotSec)
-            ax.plot(xData, yData, marker=self.get_line_plot_marker(), label=curve.avg_rate_label())
+            xData, yData = curve.get_avg_rate_data(self.slotSec)
+            ax.plot(xData, yData, marker=Plotter.get_marker(xData), label=curve.avg_rate_label())
 
         ax.ticklabel_format(useOffset=False, style='plain') # turn off scientific notation
         locator = plticker.MultipleLocator(base=1)          # enforce tick for each second on x axis
@@ -191,6 +196,67 @@ class Plotter(object):
 
 
     #
+    # Method plots average delay of curves
+    #
+    def plot_average_delay(self):
+        figure, ax = plt.subplots(figsize=(16, 9))
+
+        for curve in self.curves:
+            xData, yData = curve.get_avg_delay_data(self.slotSec)
+            ax.plot(xData, yData, marker=Plotter.get_marker(xData), label=curve.avg_delay_label())
+
+        ax.ticklabel_format(useOffset=False, style='plain') # turn off scientific notation
+        locator = plticker.MultipleLocator(base=1)          # enforce tick for each second on x axis
+        ax.xaxis.set_major_locator(locator)
+
+        ax.set_xlim(self.get_slotted_graph_x_limit())
+        ax.set_xlabel('Time (s), interval %gs' % self.slotSec, fontsize=FONT_SIZE)
+        ax.set_ylabel('One-way delay (ms)', fontsize=FONT_SIZE)
+        ax.grid()
+
+        handles, labels = ax.get_legend_handles_labels()
+
+        legend = ax.legend(Plotter.flip(handles, LABELS_IN_ROW),
+                           Plotter.flip(labels,  LABELS_IN_ROW), ncol=LABELS_IN_ROW,
+                           bbox_to_anchor=(0.5, -0.1), loc='upper center', fontsize=FONT_SIZE)
+
+        figure.savefig(self.avgDelayPath,   bbox_extra_artists=(legend,),
+                       bbox_inches='tight', pad_inches=0.2)
+
+        plt.close(figure)
+
+
+    #
+    # Method plots average Jain index of curves
+    #
+    def plot_average_jain_index(self):
+        figure, ax = plt.subplots(figsize=(16, 9))
+
+        xData, yData = self.get_jain_index_data()
+        ax.plot(xData, yData, marker=Plotter.get_marker(xData), label=self.avg_jain_index_label())
+
+        ax.ticklabel_format(useOffset=False, style='plain') # turn off scientific notation
+        locator = plticker.MultipleLocator(base=1)          # enforce tick for each second on x axis
+        ax.xaxis.set_major_locator(locator)
+
+        ax.set_xlim(self.get_slotted_graph_x_limit())
+        ax.set_xlabel('Time (s), interval %gs' % self.slotSec, fontsize=FONT_SIZE)
+        ax.set_ylabel('Jain\'s index', fontsize=FONT_SIZE)
+        ax.grid()
+
+        handles, labels = ax.get_legend_handles_labels()
+
+        legend = ax.legend(Plotter.flip(handles, LABELS_IN_ROW),
+                           Plotter.flip(labels,  LABELS_IN_ROW), ncol=LABELS_IN_ROW,
+                           bbox_to_anchor=(0.5, -0.1), loc='upper center', fontsize=FONT_SIZE)
+
+        figure.savefig(self.avgJainPath,   bbox_extra_artists=(legend,),
+                       bbox_inches='tight', pad_inches=0.2)
+
+        plt.close(figure)
+
+
+    #
     # Method finds x limit for the graphs of the slotted data
     #
     def get_slotted_graph_x_limit(self):
@@ -201,17 +267,17 @@ class Plotter(object):
             minLimit = 0
             maxLimit = int(math.ceil((self.slotsNumber - 1) * self.slotSec))
 
-        print('max-limit', self.slotsNumber, self.slotsNumber * self.slotSec, maxLimit)
-
         return minLimit, maxLimit
 
 
     #
     # Method finds marker for line graphs
+    # param [in] data - data to plot
     # returns the marker
     #
-    def get_line_plot_marker(self):
-        if self.slotsNumber <= 1:
+    @staticmethod
+    def get_marker(data):
+        if len(data) == 1:
             marker='o'
         else:
             marker = None
@@ -228,3 +294,65 @@ class Plotter(object):
     @staticmethod
     def flip(items, ncol):
         return list(itertools.chain(*[items[i::ncol] for i in range(ncol)]))
+
+
+    #
+    # Method computes slotted Jain index data to plot
+    # returns x-data and y-data
+    #
+    def get_jain_index_data(self):
+        xData = []
+        yData = []
+
+        for slotId in range(self.slotsNumber):
+            curvesNumber  = 0
+            sumRate       = 0.0
+            sumSquareRate = 0.0
+            print("slot", slotId)
+            for curve in self.curves:
+                if curve.slottedRates[slotId] is not None:
+                    curvesNumber  += 1
+                    print(sumRate, sumSquareRate)
+                    sumRate       += curve.slottedRates[slotId]
+                    sumSquareRate += curve.slottedRates[slotId]**2
+                    print(sumRate, sumSquareRate)
+
+            print(curvesNumber)
+            if curvesNumber != 0 and sumSquareRate != 0.0:
+                xData.append(self.slotSec * slotId)
+                yData.append(sumRate**2 / (float(curvesNumber) * sumSquareRate))
+                print(yData[-1])
+        return xData, yData
+
+
+    #
+    # Method generates the label for the curve of the graph of the averaged Jain index
+    # returns the label
+    #
+    def avg_jain_index_label(self):
+        self.compute_jain_index_stats()
+
+        if self.avgJain is None:
+            valueStr = 'no packets'
+        else:
+            valueStr = '{:f}'.format(self.avgJain)
+
+        return '{} ({})'.format(' & '.join([ curve.name for curve in self.curves ]), valueStr)
+
+
+    #
+    # Method computes average Jain index stats
+    #
+    def compute_jain_index_stats(self):
+        curvesNumber  = 0
+        sumRate       = 0.0
+        sumSquareRate = 0.0
+
+        for curve in self.curves:
+            if curve.curveAvgRate is not None:
+                curvesNumber  += 1
+                sumRate       += curve.curveAvgRate
+                sumSquareRate += curve.curveAvgRate**2
+
+        if curvesNumber != 0 and sumSquareRate != 0.0:
+            self.avgJain = sumRate**2 / (float(curvesNumber) * sumSquareRate)

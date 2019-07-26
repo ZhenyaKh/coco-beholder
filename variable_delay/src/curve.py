@@ -18,10 +18,12 @@ class Curve(object):
         self.slottedPkts   = None # curve's slotted packets
         self.slottedDelays = None # curve's slotted delays
         self.slottedBytes  = None # curve's slotted bytes
+        self.slottedRates  = None # curve's slotted rates
 
         self.duration = None      # duration of the curve
 
-        self.curveAvgRate = None  # curve's average rate stats
+        self.curveAvgRate  = None # curve's average rate stats
+        self.curveAvgDelay = None # curve's average delay stats
 
 
     #
@@ -47,45 +49,83 @@ class Curve(object):
 
         sumBytes = sum(self.slottedBytes)
 
-        if self.duration is not None and self.duration != 0.0:
+        if self.duration is not None:
+            # Curve duration is not zero because Flow duration is ensured not to be zero
             self.curveAvgRate = (sumBytes * BITS_IN_BYTE) / (float(self.duration) * BITS_IN_MBITS)
 
-        print('curveAvgRate', self.curveAvgRate)
+        sumDelays  = sum(self.slottedDelays)
+        sumPackets = sum(self.slottedPkts)
+
+        if sumPackets != 0:
+            self.curveAvgDelay = float(sumDelays) / sumPackets
 
 
     #
-    # Method computes x-axis and y-axis data to plot the curve
+    # Method computes x-axis and y-axis data to plot average rate of the curve
     # param [in] slotSec - slot size in seconds
+    # returns x-data and y-data
     #
-    def get_rate_data(self, slotSec):
+    def get_avg_rate_data(self, slotSec):
         xData = []
         yData = []
+
+        self.slottedRates = []
 
         for slotId, bytes in enumerate(self.slottedBytes):
             yValue = bytes * BITS_IN_BYTE
             yValue = yValue / (slotSec * BITS_IN_MBITS)
 
             if yValue == 0.0 and len(yData) == 0:
+                self.slottedRates.append(None)
                 continue # cut off front slots with zeroes
 
             yData.append(yValue)
             xData.append(slotSec * slotId)
 
-        print("ydata", yData)
+            self.slottedRates.append(yValue)
+
         return xData, yData
 
 
     #
-    # Method generates the label of the flow for the graph of the averaged rate of the flow
+    # Method computes x-axis and y-axis data to plot average delay of the curve
+    # param [in] slotSec - slot size in seconds
+    # returns x-data and y-data
+    #
+    def get_avg_delay_data(self, slotSec):
+        xData = []
+        yData = []
+
+        for slotId, delays in enumerate(self.slottedDelays):
+            if self.slottedPkts[slotId] != 0:
+                yData.append(float(delays) / self.slottedPkts[slotId])
+                xData.append(slotSec * slotId)
+
+        return xData, yData
+
+
+    #
+    # Method generates the label of the curve for the graph of the averaged rate of the curve
+    # returns the label
     #
     def avg_rate_label(self):
-        if   self.duration is None:
+        if self.curveAvgRate is None:
             valueStr = 'no packets'
-        elif self.duration == 0.0:
-            valueStr = 'zero duration'
         else:
-            assert self.curveAvgRate is not None
             valueStr = '{:.2f} Mbps'.format(self.curveAvgRate)
+
+        return '{} ({})'.format(self.name, valueStr)
+
+
+    #
+    # Method generates the label of the curve for the graph of the averaged delay of the curve
+    # returns the label
+    #
+    def avg_delay_label(self):
+        if self.curveAvgDelay is None:
+            valueStr = 'no packets'
+        else:
+            valueStr = '{:.2f} ms'.format(self.curveAvgDelay)
 
         return '{} ({})'.format(self.name, valueStr)
 

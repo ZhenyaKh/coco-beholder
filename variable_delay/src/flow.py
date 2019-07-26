@@ -27,6 +27,13 @@ class Flow(object):
     def compute_time_bounds(self, directory):
         self.start, self.end = get_data_duration(directory, self.id + 1)
 
+        if self.start is not None:
+            assert self.end is not None
+
+            if (self.end - self.start) == 0.0: # forbidding one-packet flows
+                self.start = None
+                self.end   = None
+
 
     #
     # Method computes slotted data for the flow
@@ -36,7 +43,11 @@ class Flow(object):
     # throws DataError
     #
     def compute_slotted_data(self, directory, slotsNumber, slotSec):
-        arrivals, delays, sizes = load_data(directory, self.id + 1)
+        if self.start is None:
+            assert self.end is None
+            arrivals, delays, sizes = [], [], []
+        else:
+            arrivals, delays, sizes = load_data(directory, self.id + 1)
 
         self.compute_slotted_packets(arrivals, slotsNumber, slotSec)
         del arrivals[:]
