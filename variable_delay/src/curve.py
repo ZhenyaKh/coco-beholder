@@ -20,7 +20,8 @@ class Curve(object):
         self.slottedBytes  = None # curve's slotted bytes
         self.slottedRates  = None # curve's slotted rates
 
-        self.duration = None      # duration of the curve
+        self.start         = None # curve's duration start time
+        self.end           = None # curve's duration end time
 
         self.curveAvgRate  = None # curve's average rate stats
         self.curveAvgDelay = None # curve's average delay stats
@@ -45,13 +46,14 @@ class Curve(object):
     # Method computes statistics values for the curve
     #
     def compute_stats(self):
-        self.compute_duration()
+        self.compute_time_bounds()
 
         sumBytes = sum(self.slottedBytes)
 
-        if self.duration is not None:
+        if self.start is not None:
+            duration = float(self.end - self.start)
             # Curve duration is not zero because Flow duration is ensured not to be zero
-            self.curveAvgRate = (sumBytes * BITS_IN_BYTE) / (float(self.duration) * BITS_IN_MBITS)
+            self.curveAvgRate = (sumBytes * BITS_IN_BYTE) / (duration * BITS_IN_MBITS)
 
         sumDelays  = sum(self.slottedDelays)
         sumPackets = sum(self.slottedPkts)
@@ -62,27 +64,26 @@ class Curve(object):
 
     #
     # Method computes x-axis and y-axis data to plot average rate of the curve
-    # param [in] slotSec - slot size in seconds
+    # param [in] slotSec - float slot size in seconds
     # returns x-data and y-data
     #
     def get_avg_rate_data(self, slotSec):
         xData = []
         yData = []
 
-        self.slottedRates = []
+        self.slottedRates = [None] * len(self.slottedBytes)
 
-        for slotId, bytes in enumerate(self.slottedBytes):
-            yValue = bytes * BITS_IN_BYTE
-            yValue = yValue / (slotSec * BITS_IN_MBITS)
+        if self.start is not None:
+            startSlotId = int(self.start / slotSec)
+            endSlotId   = int(self.end   / slotSec)
 
-            if yValue == 0.0 and len(yData) == 0:
-                self.slottedRates.append(None)
-                continue # cut off front slots with zeroes
+            for slotId in range(startSlotId, endSlotId + 1):
+                yValue = self.slottedBytes[slotId] * BITS_IN_BYTE / (slotSec * BITS_IN_MBITS)
 
-            yData.append(yValue)
-            xData.append(slotSec * slotId)
+                yData.append(yValue)
+                xData.append(slotSec * slotId)
 
-            self.slottedRates.append(yValue)
+                self.slottedRates[slotId] = yValue
 
         return xData, yData
 
@@ -131,9 +132,9 @@ class Curve(object):
 
 
     #
-    # Method computes duration of the curve
+    # Method computes start and end of duration of the curve
     #
-    def compute_duration(self):
+    def compute_time_bounds(self):
         minStart = None
         maxEnd   = None
 
@@ -152,6 +153,9 @@ class Curve(object):
 
         if minStart is None:
             assert maxEnd is None
-            self.duration = None
+            self.start = None
+            self.end   = None
         else:
-            self.duration = maxEnd - minStart
+            assert maxEnd is not None
+            self.start = minStart
+            self.end   = maxEnd

@@ -179,8 +179,9 @@ class Plotter(object):
         ax.xaxis.set_major_locator(locator)
 
         ax.set_xlim(self.get_slotted_graph_x_limit())
-        ax.set_xlabel('Time (s), interval %gs' % self.slotSec, fontsize=FONT_SIZE)
-        ax.set_ylabel('Throughput (Mbit/s)',                   fontsize=FONT_SIZE)
+        ax.set_xlabel('Time (s), interval %gs' % self.slotSec,             fontsize=FONT_SIZE)
+        ax.set_ylabel('Throughput (Mbit/s)',                               fontsize=FONT_SIZE)
+        ax.set_title ('In ( ): the curve\'s overall average', loc='right', fontsize=FONT_SIZE)
         ax.grid()
 
         handles, labels = ax.get_legend_handles_labels()
@@ -210,8 +211,9 @@ class Plotter(object):
         ax.xaxis.set_major_locator(locator)
 
         ax.set_xlim(self.get_slotted_graph_x_limit())
-        ax.set_xlabel('Time (s), interval %gs' % self.slotSec, fontsize=FONT_SIZE)
-        ax.set_ylabel('One-way delay (ms)', fontsize=FONT_SIZE)
+        ax.set_xlabel('Time (s), interval %gs' % self.slotSec,             fontsize=FONT_SIZE)
+        ax.set_ylabel('One-way delay (ms)',                                fontsize=FONT_SIZE)
+        ax.set_title ('In ( ): the curve\'s overall average', loc='right', fontsize=FONT_SIZE)
         ax.grid()
 
         handles, labels = ax.get_legend_handles_labels()
@@ -240,8 +242,9 @@ class Plotter(object):
         ax.xaxis.set_major_locator(locator)
 
         ax.set_xlim(self.get_slotted_graph_x_limit())
-        ax.set_xlabel('Time (s), interval %gs' % self.slotSec, fontsize=FONT_SIZE)
-        ax.set_ylabel('Jain\'s index', fontsize=FONT_SIZE)
+        ax.set_xlabel('Time (s), interval %gs' % self.slotSec,    fontsize=FONT_SIZE)
+        ax.set_ylabel('Jain\'s index',                            fontsize=FONT_SIZE)
+        ax.set_title ('In ( ): the overall average', loc='right', fontsize=FONT_SIZE)
         ax.grid()
 
         handles, labels = ax.get_legend_handles_labels()
@@ -308,20 +311,17 @@ class Plotter(object):
             curvesNumber  = 0
             sumRate       = 0.0
             sumSquareRate = 0.0
-            print("slot", slotId)
+
             for curve in self.curves:
                 if curve.slottedRates[slotId] is not None:
                     curvesNumber  += 1
-                    print(sumRate, sumSquareRate)
                     sumRate       += curve.slottedRates[slotId]
                     sumSquareRate += curve.slottedRates[slotId]**2
-                    print(sumRate, sumSquareRate)
 
-            print(curvesNumber)
             if curvesNumber != 0 and sumSquareRate != 0.0:
                 xData.append(self.slotSec * slotId)
                 yData.append(sumRate**2 / (float(curvesNumber) * sumSquareRate))
-                print(yData[-1])
+
         return xData, yData
 
 
