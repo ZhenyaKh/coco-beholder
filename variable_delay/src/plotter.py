@@ -22,6 +22,8 @@ PLOTS_EXTENSION  = 'png'
 STATS_EXTENSION  = 'log'
 LABELS_IN_ROW    = 4
 FONT_SIZE        = 12
+CURVE            = 'curve'
+CURVES           = 'curves'
 
 
 #
@@ -178,12 +180,12 @@ class Plotter(object):
         locator = plticker.MultipleLocator(base=1)          # enforce tick for each second on x axis
         ax.xaxis.set_major_locator(locator)
 
-        ax.set_xlim(self.get_slotted_graph_x_limit())
-        ax.set_xlabel('Time (s), interval %gs' % self.slotSec,             fontsize=FONT_SIZE)
-        ax.set_ylabel('Throughput (Mbit/s)',                               fontsize=FONT_SIZE)
-        ax.set_title ('In ( ): the curve\'s overall average', loc='right', fontsize=FONT_SIZE)
         ax.grid()
-
+        ax.set_xlim(self.get_slotted_graph_x_limit())
+        ax.set_xlabel('Time (s), interval %gs' % self.slotSec,           fontsize=FONT_SIZE)
+        ax.set_ylabel('Throughput (Mbit/s)',                             fontsize=FONT_SIZE)
+        ax.set_title ('In ( ): the curve\'s overall average throughput', fontsize=FONT_SIZE,
+                                                                         loc='right')
         handles, labels = ax.get_legend_handles_labels()
 
         legend = ax.legend(Plotter.flip(handles, LABELS_IN_ROW),
@@ -211,9 +213,9 @@ class Plotter(object):
         ax.xaxis.set_major_locator(locator)
 
         ax.set_xlim(self.get_slotted_graph_x_limit())
-        ax.set_xlabel('Time (s), interval %gs' % self.slotSec,             fontsize=FONT_SIZE)
-        ax.set_ylabel('One-way delay (ms)',                                fontsize=FONT_SIZE)
-        ax.set_title ('In ( ): the curve\'s overall average', loc='right', fontsize=FONT_SIZE)
+        ax.set_xlabel('Time (s), interval %gs' % self.slotSec,                   fontsize=FONT_SIZE)
+        ax.set_ylabel('One-way delay (ms)',                                      fontsize=FONT_SIZE)
+        ax.set_title ('In ( ): the curve\'s overall average delay', loc='right', fontsize=FONT_SIZE)
         ax.grid()
 
         handles, labels = ax.get_legend_handles_labels()
@@ -241,12 +243,12 @@ class Plotter(object):
         locator = plticker.MultipleLocator(base=1)          # enforce tick for each second on x axis
         ax.xaxis.set_major_locator(locator)
 
-        ax.set_xlim(self.get_slotted_graph_x_limit())
-        ax.set_xlabel('Time (s), interval %gs' % self.slotSec,    fontsize=FONT_SIZE)
-        ax.set_ylabel('Jain\'s index',                            fontsize=FONT_SIZE)
-        ax.set_title ('In ( ): the overall average', loc='right', fontsize=FONT_SIZE)
         ax.grid()
-
+        ax.set_xlim(self.get_slotted_graph_x_limit())
+        ax.set_xlabel('Time (s), interval %gs' % self.slotSec,                   fontsize=FONT_SIZE)
+        ax.set_ylabel('Jain\'s index',                                           fontsize=FONT_SIZE)
+        ax.set_title ('In ( ): index over curves\' overall average throughputs', fontsize=FONT_SIZE,
+                                                                                 loc='right')
         handles, labels = ax.get_legend_handles_labels()
 
         legend = ax.legend(Plotter.flip(handles, LABELS_IN_ROW),
@@ -333,11 +335,15 @@ class Plotter(object):
         self.compute_jain_index_stats()
 
         if self.avgJain is None:
-            valueStr = 'no packets'
+            valueStr = 'no overall average throughputs'
         else:
             valueStr = '{:f}'.format(self.avgJain)
 
-        return '{} ({})'.format(' & '.join([ curve.name for curve in self.curves ]), valueStr)
+        curvesWord = CURVE if len(self.curves) == 1 else CURVES
+
+        curvesName = 'All {:d} {}'.format(len(self.curves), curvesWord)
+
+        return '{} ({})'.format(curvesName, valueStr)
 
 
     #

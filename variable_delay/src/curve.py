@@ -1,5 +1,7 @@
-BITS_IN_BYTE  = 8
-BITS_IN_MBITS = 1000000
+MIN_DURATION_SEC  = 0.005 # same value as in Wireshark
+BITS_IN_BYTE      = 8
+BITS_IN_MBITS     = 1000000
+MS_IN_SEC         = 1000
 
 
 #
@@ -52,8 +54,9 @@ class Curve(object):
 
         if self.start is not None:
             duration = float(self.end - self.start)
-            # Curve duration is not zero because Flow duration is ensured not to be zero
-            self.curveAvgRate = (sumBytes * BITS_IN_BYTE) / (duration * BITS_IN_MBITS)
+
+            if duration >= MIN_DURATION_SEC:
+                self.curveAvgRate = (sumBytes * BITS_IN_BYTE) / (duration * BITS_IN_MBITS)
 
         sumDelays  = sum(self.slottedDelays)
         sumPackets = sum(self.slottedPkts)
@@ -110,8 +113,16 @@ class Curve(object):
     # returns the label
     #
     def avg_rate_label(self):
+        valueStr = None
+
         if self.curveAvgRate is None:
-            valueStr = 'no packets'
+            if self.start is None:
+                valueStr = 'no packets'
+            else:
+                duration = float(self.end - self.start)
+
+                if duration < MIN_DURATION_SEC:
+                    valueStr = "<{:g}ms duration".format(MIN_DURATION_SEC * MS_IN_SEC)
         else:
             valueStr = '{:.2f} Mbps'.format(self.curveAvgRate)
 

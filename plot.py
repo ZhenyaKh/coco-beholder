@@ -119,7 +119,8 @@ def parse_arguments():
     'graphs and stats: per-flow (-f), total (-t), per-subset (-s). For any type chosen, the '
     'following graphs and stats are generated: average throughput, average Jain index, average '
     'one-way delay, per-packet one-way delay. The average graphs are averaged per chosen time '
-    'interval (-i).')
+    'interval (-i). Average Jain index graph always contains one curve, as it is computed over '
+    'the curves present in the corresponding average throughput graph.')
 
     add_arguments(parser)
 
