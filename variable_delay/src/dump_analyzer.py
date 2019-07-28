@@ -84,7 +84,7 @@ class DumpAnalyzer(object):
         save_metadata(self.outDir, self.metadata)
         self.metadata.clear()
 
-        self.baseTime = self.get_base_time () # TODO: do not forget to check what if None
+        self.baseTime = self.get_base_time ()
 
         for flow in range(0, self.flows):
             print("\n\033[1m%s scheme, flow %d:\033[0m\n" % (self.schemes[flow], flow + 1)) # bold
