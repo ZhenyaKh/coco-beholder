@@ -93,18 +93,23 @@ class Plotter(object):
 
         self.compute_slots_number()
 
+        print('Loading data of the curves...')
         self.compute_curves_average_data()
 
         self.free_flows_data()
 
+        print('Plotting average throughput...')
         self.plot_average_rate()
 
+        print('Plotting average one-way delay...')
         self.plot_average_delay()
 
         self.jainIndex = JainIndex(self.curves)
 
+        print('Plotting average Jain\'s index...')
         self.plot_average_jain_index()
 
+        print('Saving average statistics...')
         self.statsWriter.write_average(self.statsPath, self.curves, self.jainIndex)
 
         self.free_curves_data()
