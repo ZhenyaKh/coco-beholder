@@ -16,6 +16,8 @@ class JainIndex(object):
         self.curves  = curves # curves over which the index is computed
         self.avgJain = None   # average Jain index
 
+        self.compute_jain_index_stats()
+
 
     #
     # Method computes slotted Jain index data to plot
@@ -50,8 +52,6 @@ class JainIndex(object):
     # returns the label
     #
     def get_label(self):
-        self.compute_jain_index_stats()
-
         if self.avgJain is None:
             valueStr = 'no overall average throughputs'
         else:
@@ -62,6 +62,19 @@ class JainIndex(object):
         curvesName = 'All {:d} {}'.format(len(self.curves), curvesWord)
 
         return '{} ({})'.format(curvesName, valueStr)
+
+
+    #
+    # Method generates the statistics string for the averaged Jain index
+    # returns the statistics string
+    #
+    def get_stats_string(self):
+        if self.avgJain is None:
+            valueStr = 'N/A as none of the curves has average throughput to count the index over'
+        else:
+            valueStr = '{:f}'.format(self.avgJain)
+
+        return 'Average Jain\'s index : {}'.format(valueStr)
 
 
     #

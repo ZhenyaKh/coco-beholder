@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import gc
 import math
 import itertools
 import matplotlib
@@ -13,6 +14,7 @@ from variable_delay.src.metadata_fields import ALL_FLOWS, SORTED_LAYOUT
 from variable_delay.src.data import DataError
 from variable_delay.src.flow import Flow
 from variable_delay.src.jain_index import JainIndex
+from variable_delay.src.stats_writer import StatsWriter, StatsWriterError
 
 AVERAGE_RATE     = 'avg-rate'
 AVERAGE_FAIRNESS = 'avg-jain'
@@ -49,6 +51,7 @@ class Plotter(object):
         self.flows       = [ Flow(i) for i in range(flowsNumber) ] # flows
         self.slotsNumber = None                                    # number of slots
         self.jainIndex   = None                                    # average Jain index
+        self.statsWriter = StatsWriter()                           # statistics writer
 
         self.curves = self.type.get_curves(metadata[SORTED_LAYOUT], self.flows) # curves
 
@@ -64,9 +67,15 @@ class Plotter(object):
 
     #
     # Method generates plots and stats over data extracted from pcap-files.
+    # throws DataError, StatsWriterError
     #
     def generate(self):
         self.plot_average()
+
+        self.statsWriter.write_average(self.statsPath, self.curves, self.jainIndex)
+
+        gc.collect()
+
 
 
     #
@@ -104,6 +113,8 @@ class Plotter(object):
         self.jainIndex = JainIndex(self.curves)
 
         self.plot_average_jain_index()
+
+        self.free_curves_data()
 
 
     #
@@ -261,6 +272,14 @@ class Plotter(object):
                        bbox_inches='tight', pad_inches=0.2)
 
         plt.close(figure)
+
+
+    #
+    # Method frees data of the curves
+    #
+    def free_curves_data(self):
+        for curve in self.curves:
+            curve.free_data()
 
 
     #

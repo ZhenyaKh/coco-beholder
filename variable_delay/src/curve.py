@@ -122,7 +122,7 @@ class Curve(object):
                 duration = float(self.end - self.start)
 
                 if duration < MIN_DURATION_SEC:
-                    valueStr = "<{:g}ms duration".format(MIN_DURATION_SEC * MS_IN_SEC)
+                    valueStr = '<{:g}ms duration'.format(MIN_DURATION_SEC * MS_IN_SEC)
         else:
             valueStr = '{:.2f} Mbps'.format(self.curveAvgRate)
 
@@ -140,6 +140,51 @@ class Curve(object):
             valueStr = '{:.2f} ms'.format(self.curveAvgDelay)
 
         return '{} ({})'.format(self.name, valueStr)
+
+
+    #
+    # Method frees the data of the curve
+    #
+    def free_data(self):
+        del self.slottedPkts  [:]
+        del self.slottedDelays[:]
+        del self.slottedBytes [:]
+        del self.slottedRates [:]
+
+
+    #
+    # Method gets the statistics string of the average rate
+    # returns the statistics string
+    #
+    def get_avg_rate_stats_string(self):
+        valueStr = None
+
+        if self.curveAvgRate is None:
+            if self.start is None:
+                valueStr = 'N/A as the curve has no packets'
+            else:
+                duration = float(self.end - self.start)
+
+                if duration < MIN_DURATION_SEC:
+                    valueStr = 'N/A as the curve\'s duration is less than {:g}ms'.\
+                        format(MIN_DURATION_SEC * MS_IN_SEC)
+        else:
+            valueStr = '{:f} Mbps'.format(self.curveAvgRate)
+
+        return 'Average throughput   : {}'.format(valueStr)
+
+
+    #
+    # Method gets the statistics string of the average delay
+    # returns the statistics string
+    #
+    def get_avg_delay_stats_string(self):
+        if self.curveAvgDelay is None:
+            valueStr = 'N/A as the curve has no packets'
+        else:
+            valueStr = '{:f} ms'.format(self.curveAvgDelay)
+
+        return 'Average one-way delay: {}'.format(valueStr)
 
 
     #

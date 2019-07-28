@@ -8,7 +8,7 @@ from variable_delay.src.help_formatter import BlankLinesHelpFormatter
 from variable_delay.src.per_flow_plot import PerFlowPlot
 from variable_delay.src.total_plot import TotalPlot
 from variable_delay.src.per_subset_plot import PerSubsetPlot, PlotTypeError
-from variable_delay.src.plotter import Plotter, MetadataError, DataError
+from variable_delay.src.plotter import Plotter, MetadataError, DataError, StatsWriterError
 
 WORKING_DIR          = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_IN_DIR_NAME  = os.path.join('graphs', 'data')
@@ -147,6 +147,8 @@ if __name__ == '__main__':
         print("Metadata ERROR:\n%s" % error)
     except DataError as error:
         print("Input data ERROR:\n%s" % error)
+    except StatsWriterError as error:
+        print("Writing statistics ERROR:\n%s" % error)
     except KeyboardInterrupt:
         print("KeyboardInterrupt was caught")
         exitCode = EXIT_FAILURE
