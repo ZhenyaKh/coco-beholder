@@ -74,7 +74,7 @@ class JainIndex(object):
         else:
             valueStr = '{:f}'.format(self.avgJain)
 
-        return 'Average Jain\'s index : {}'.format(valueStr)
+        return 'Average Jain\'s index  : {}'.format(valueStr)
 
 
     #

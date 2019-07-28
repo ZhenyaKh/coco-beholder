@@ -55,8 +55,6 @@ class Plotter(object):
 
         self.curves = self.type.get_curves(metadata[SORTED_LAYOUT], self.flows) # curves
 
-        # TODO: empty flows!
-
         # full paths of output graphs and stats
         self.avgRatePath  = self.get_output_file_name(AVERAGE_RATE,     PLOTS_EXTENSION)
         self.avgJainPath  = self.get_output_file_name(AVERAGE_FAIRNESS, PLOTS_EXTENSION)
@@ -66,16 +64,13 @@ class Plotter(object):
 
 
     #
-    # Method generates plots and stats over data extracted from pcap-files.
+    # Method generates plots and stats over data extracted from pcap-files
     # throws DataError, StatsWriterError
     #
     def generate(self):
-        self.plot_average()
-
-        self.statsWriter.write_average(self.statsPath, self.curves, self.jainIndex)
+        self.generate_average()
 
         gc.collect()
-
 
 
     #
@@ -90,21 +85,17 @@ class Plotter(object):
 
 
     #
-    # Method slotted graphs: average rate, averaga Jain index, average one-way delay
-    # throws DataError
+    # Method generates average plots/stats: average rate, average Jain index, average one-way delay
+    # throws DataError, StatsWriterError
     #
-    def plot_average(self):
-        self.compute_flows_time_bounds()
+    def generate_average(self):
+        self.compute_curves_time_bounds()
 
         self.compute_slots_number()
 
-        self.compute_slotted_flow_data()
-
-        self.compute_slotted_curve_data()
+        self.compute_curves_average_data()
 
         self.free_flows_data()
-
-        self.compute_curve_stats()
 
         self.plot_average_rate()
 
@@ -114,16 +105,18 @@ class Plotter(object):
 
         self.plot_average_jain_index()
 
+        self.statsWriter.write_average(self.statsPath, self.curves, self.jainIndex)
+
         self.free_curves_data()
 
 
     #
-    # Methods computes start and end timestamps for each flow
+    # Methods computes start and end timestamps for each curve
     # throws DataError
     #
-    def compute_flows_time_bounds(self):
-        for flowId, flow in enumerate(self.flows):
-            flow.compute_time_bounds(self.inDir)
+    def compute_curves_time_bounds(self):
+        for curve in self.curves:
+            curve.compute_time_bounds(self.inDir)
 
 
     #
@@ -132,12 +125,12 @@ class Plotter(object):
     def compute_slots_number(self):
         maxEnd = None
 
-        for flow in self.flows:
-            if flow.end is not None:
+        for curve in self.curves:
+            if curve.end is not None:
                 if maxEnd is None:
-                    maxEnd = flow.end
+                    maxEnd = curve.end
                 else:
-                    maxEnd = max(flow.end, maxEnd)
+                    maxEnd = max(curve.end, maxEnd)
 
         if maxEnd is None:
             self.slotsNumber = int(0)
@@ -146,36 +139,20 @@ class Plotter(object):
 
 
     #
-    # Method computes slotted data for each flow
+    # Method computes average data for each curve
     # throws DataError
     #
-    def compute_slotted_flow_data(self):
-        for flowId, flow in enumerate(self.flows):
-            flow.compute_slotted_data(self.inDir, self.slotsNumber, self.slotSec)
-
-
-    #
-    # Method computes slotted data for each curve
-    #
-    def compute_slotted_curve_data(self):
+    def compute_curves_average_data(self):
         for curve in self.curves:
-            curve.merge_flows_slotted_data()
+            curve.compute_average_data(self.inDir, self.slotsNumber, self.slotSec)
 
 
     #
     # Method frees the data of all the flows
     #
     def free_flows_data(self):
-        for flow in self.flows:
-            flow.free_data()
-
-
-    #
-    # Method computes statistics values for each curve
-    #
-    def compute_curve_stats(self):
         for curve in self.curves:
-            curve.compute_stats()
+            curve.free_flows_data()
 
 
     #
@@ -320,5 +297,3 @@ class Plotter(object):
     @staticmethod
     def flip(items, ncol):
         return list(itertools.chain(*[items[i::ncol] for i in range(ncol)]))
-
-

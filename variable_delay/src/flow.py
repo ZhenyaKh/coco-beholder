@@ -17,6 +17,8 @@ class Flow(object):
         self.slottedPkts   = None # flow slotted packets
         self.slottedDelays = None # flow slotted delays
         self.slottedBytes  = None # flow slotted bytes
+        self.lostSentBytes = None # flow lost bytes
+        self.allSentBytes  = None # flow sent bytes
 
 
     #
@@ -29,14 +31,16 @@ class Flow(object):
 
 
     #
-    # Method computes slotted data for the flow
+    # Method computes average data for the flow
     # param [in] directory   - input directory containing the log file
     # param [in] slotsNumber - number of slots
     # param [in] slotSec     - float slot size in seconds
     # throws DataError
     #
-    def compute_slotted_data(self, directory, slotsNumber, slotSec):
-        arrivals, delays, sizes = load_data(directory, self.id + 1)
+    def compute_average_data(self, directory, slotsNumber, slotSec):
+        arrivals, delays, sizes, loss = load_data(directory, self.id + 1)
+
+        self.lostSentBytes, self.allSentBytes = loss
 
         self.compute_slotted_packets(arrivals, slotsNumber, slotSec)
         del arrivals[:]
@@ -55,6 +59,13 @@ class Flow(object):
         del self.slottedPkts  [:]
         del self.slottedDelays[:]
         del self.slottedBytes [:]
+
+        del self.slottedPkts
+        del self.slottedDelays
+        del self.slottedBytes
+
+        del self.lostSentBytes
+        del self.allSentBytes
 
 
     #

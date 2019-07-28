@@ -2,6 +2,7 @@ MIN_DURATION_SEC  = 0.005 # same value as in Wireshark
 BITS_IN_BYTE      = 8
 BITS_IN_MBITS     = 1000000
 MS_IN_SEC         = 1000
+PERCENTS          = 100.0
 
 
 #
@@ -17,22 +18,68 @@ class Curve(object):
         self.flows = flows        # flows of the curve
         self.name  = name         # name of the curve
 
+        self.start         = None # curve's duration start time
+        self.end           = None # curve's duration end time
+
         self.slottedPkts   = None # curve's slotted packets
         self.slottedDelays = None # curve's slotted delays
         self.slottedBytes  = None # curve's slotted bytes
         self.slottedRates  = None # curve's slotted rates
 
-        self.start         = None # curve's duration start time
-        self.end           = None # curve's duration end time
-
         self.curveAvgRate  = None # curve's average rate stats
         self.curveAvgDelay = None # curve's average delay stats
+        self.curveLoss     = None # curve's loss percentage
+
+        # to ensure that compute_time_bounds is called before any other methods
+        del self.start
+        del self.end
 
 
     #
-    # Method computes per slot data of the curve
+    # Method computes the curve's data first and last arrivals.
+    # param [in] directory - input directory containing the log files
+    # throws DataError
     #
-    def merge_flows_slotted_data(self):
+    def compute_time_bounds(self, directory):
+        minStart = None
+        maxEnd   = None
+
+        for flow in self.flows:
+            flow.compute_time_bounds(directory)
+
+            if flow.start is not None:
+                if minStart is None:
+                    minStart = flow.start
+                else:
+                    minStart = min(minStart, flow.start)
+
+            if flow.end is not None:
+                if maxEnd is None:
+                    maxEnd = flow.end
+                else:
+                    maxEnd = max(maxEnd, flow.end)
+
+        if minStart is None:
+            assert maxEnd is None
+            self.start = None
+            self.end   = None
+        else:
+            assert maxEnd is not None
+            self.start = minStart
+            self.end   = maxEnd
+
+
+    #
+    # Method computes average data for the curve
+    # param [in] directory   - input directory containing the log files
+    # param [in] slotsNumber - number of slots
+    # param [in] slotSec     - float slot size in seconds
+    # throws DataError
+    #
+    def compute_average_data(self, directory, slotsNumber, slotSec):
+        for flow in self.flows:
+            flow.compute_average_data(directory, slotsNumber, slotSec)
+
         self.slottedPkts   = [0] * len(self.flows[0].slottedPkts)
         self.slottedDelays = [0] * len(self.slottedPkts)
         self.slottedBytes  = [0] * len(self.slottedPkts)
@@ -43,26 +90,15 @@ class Curve(object):
                 self.slottedDelays[slotId] += flow.slottedDelays[slotId]
                 self.slottedBytes[slotId]  += flow.slottedBytes[slotId]
 
+        self.compute_stats()
+
 
     #
-    # Method computes statistics values for the curve
+    # Method frees the data of the flows belonging to the curve
     #
-    def compute_stats(self):
-        self.compute_time_bounds()
-
-        sumBytes = sum(self.slottedBytes)
-
-        if self.start is not None:
-            duration = float(self.end - self.start)
-
-            if duration >= MIN_DURATION_SEC:
-                self.curveAvgRate = (sumBytes * BITS_IN_BYTE) / (duration * BITS_IN_MBITS)
-
-        sumDelays  = sum(self.slottedDelays)
-        sumPackets = sum(self.slottedPkts)
-
-        if sumPackets != 0:
-            self.curveAvgDelay = float(sumDelays) / sumPackets
+    def free_flows_data(self):
+        for flow in self.flows:
+            flow.free_data()
 
 
     #
@@ -143,13 +179,22 @@ class Curve(object):
 
 
     #
-    # Method frees the data of the curve
+    # Method frees the data of the curve itself
     #
     def free_data(self):
         del self.slottedPkts  [:]
         del self.slottedDelays[:]
         del self.slottedBytes [:]
         del self.slottedRates [:]
+
+        del self.slottedPkts
+        del self.slottedDelays
+        del self.slottedBytes
+        del self.slottedRates
+
+        del self.curveAvgRate
+        del self.curveAvgDelay
+        del self.curveLoss
 
 
     #
@@ -171,7 +216,7 @@ class Curve(object):
         else:
             valueStr = '{:f} Mbps'.format(self.curveAvgRate)
 
-        return 'Average throughput   : {}'.format(valueStr)
+        return 'Average throughput    : {}'.format(valueStr)
 
 
     #
@@ -184,34 +229,67 @@ class Curve(object):
         else:
             valueStr = '{:f} ms'.format(self.curveAvgDelay)
 
-        return 'Average one-way delay: {}'.format(valueStr)
+        return 'Average one-way delay : {}'.format(valueStr)
 
 
     #
-    # Method computes start and end of duration of the curve
+    # Method gets the statistics string of the loss
+    # returns the statistics string
     #
-    def compute_time_bounds(self):
-        minStart = None
-        maxEnd   = None
+    def get_loss_stats_string(self):
+        if self.curveLoss is None:
+            valueStr = 'N/A as no bytes were sent by the curve\'s senders'
+        else:
+            valueStr = '{:f} %'.format(self.curveLoss)
+
+        return 'Loss                  : {}'.format(valueStr)
+
+
+    #
+    # Method computes statistics values for the curve
+    #
+    def compute_stats(self):
+        self.compute_average_rate()
+
+        self.compute_average_delay()
+
+        self.compute_loss()
+
+
+    #
+    # Method computes the curve's average throughput stats
+    #
+    def compute_average_rate(self):
+        sumBytes = sum(self.slottedBytes)
+
+        if self.start is not None:
+            duration = float(self.end - self.start)
+
+            if duration >= MIN_DURATION_SEC:
+                self.curveAvgRate = (sumBytes * BITS_IN_BYTE) / (duration * BITS_IN_MBITS)
+
+
+    #
+    # Method computes the curve's average one-way delay stats
+    #
+    def compute_average_delay(self):
+        sumDelays  = sum(self.slottedDelays)
+        sumPackets = sum(self.slottedPkts)
+
+        if sumPackets != 0:
+            self.curveAvgDelay = float(sumDelays) / sumPackets
+
+
+    #
+    # Method computes the curve's loss rate stats
+    #
+    def compute_loss(self):
+        lostSentBytes = 0
+        allSentBytes  = 0
 
         for flow in self.flows:
-            if flow.start is not None:
-                if minStart is None:
-                    minStart = flow.start
-                else:
-                    minStart = min(minStart, flow.start)
+            lostSentBytes += flow.lostSentBytes
+            allSentBytes  += flow.allSentBytes
 
-            if flow.end is not None:
-                if maxEnd is None:
-                    maxEnd = flow.end
-                else:
-                    maxEnd = max(maxEnd, flow.end)
-
-        if minStart is None:
-            assert maxEnd is None
-            self.start = None
-            self.end   = None
-        else:
-            assert maxEnd is not None
-            self.start = minStart
-            self.end   = maxEnd
+        if allSentBytes != 0:
+            self.curveLoss = float(lostSentBytes) / allSentBytes * PERCENTS

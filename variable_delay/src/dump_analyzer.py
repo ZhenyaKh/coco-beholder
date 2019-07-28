@@ -19,6 +19,7 @@ from variable_delay.src.data_fields import *
 MS_IN_SEC = 1000
 UTF8      = 'utf-8'
 PYTHON3   = 3
+PERCENTS  = 100.0
 
 
 #
@@ -96,7 +97,7 @@ class DumpAnalyzer(object):
             self.departures[flow].clear()
 
             print("\nSaving the data of the flow to the file...\n")
-            save_data(self.outDir, flow, self.arrivals[flow], self.delays[flow], self.sizes[flow])
+            self.save_flow_data(flow)
             print("==========================================")
 
             del self.delays  [flow][:] # Immediately frees memory only for python3. For python2 even
@@ -274,7 +275,18 @@ class DumpAnalyzer(object):
 
         if self.allSentBytes[flow] != 0:
             print((u"\u2660 Loss (ratio of \u2663 bytes to \u2665 bytes)              : %.3f%%" %
-                   (float(self.lostSentBytes[flow]) / self.allSentBytes[flow] * 100)))
+                   (float(self.lostSentBytes[flow]) / self.allSentBytes[flow] * PERCENTS)))
+
+
+    #
+    # Method writes flow data to a log file
+    # param [in] flow - flow index
+    # throws DataError
+    #
+    def save_flow_data(self, flow):
+        loss = [self.lostSentBytes[flow], self.allSentBytes[flow]]
+
+        save_data(self.outDir, flow, self.arrivals[flow], self.delays[flow], self.sizes[flow], loss)
 
 
     #

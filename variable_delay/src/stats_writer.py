@@ -62,7 +62,8 @@ class StatsWriter(object):
         for curve in curves:
             output += '-- Curve "{}":\n'.format(curve.name)
             output += '{}\n'          .format(curve.get_avg_rate_stats_string())
-            output += '{}\n\n'        .format(curve.get_avg_delay_stats_string())
+            output += '{}\n'          .format(curve.get_avg_delay_stats_string())
+            output += '{}\n\n'        .format(curve.get_loss_stats_string())
         try:
             with open(filePath, self.mode) as file:
                 file.write(output)

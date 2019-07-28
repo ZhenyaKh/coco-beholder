@@ -21,9 +21,10 @@ class DataError(Exception):
 # param [in] arrivals  - timestamps of arrivals of the flow's packets
 # param [in] delays    - one-way delays of the flow's packets
 # param [in] sizes     - sizes in bytes of the flow's packets
+# param [in] loss      - list: [the flows's lost bytes number, the flow's total sent bytes number]
 # throws DataError
 #
-def save_data(directory, flow, arrivals, delays, sizes):
+def save_data(directory, flow, arrivals, delays, sizes, loss):
     filePath = os.path.join(directory, "{}-{:d}.{}".format(DATA, flow + 1, LOG))
 
     duration = [None, None] if len(arrivals) == 0 else [arrivals[0], arrivals[-1]]
@@ -33,6 +34,8 @@ def save_data(directory, flow, arrivals, delays, sizes):
         # json.dump(data, file). So, here, speed is chosen over memory consumption.
         with open(filePath, 'w') as file:
             file.write(json.dumps(duration))
+            file.write('\n')
+            file.write(json.dumps(loss))
             file.write('\n')
             file.write(json.dumps(arrivals))
             file.write('\n')
@@ -69,7 +72,7 @@ def get_data_duration(directory, flow):
 # param [in] directory - input directory containing the log file
 # param [in] flow      - flow index
 # returns timestamps of arrivals of the flow's packets, one-way delays of the flow's packets,
-# sizes in bytes of the flow's packets
+# sizes in bytes of the flow's packets, the flows's lost bytes number and total sent bytes number
 # throws DataError
 #
 def load_data(directory, flow):
@@ -78,11 +81,12 @@ def load_data(directory, flow):
     try:
         with open(filePath, 'r') as file:
             _        = json.loads(next(file))
+            loss     = json.loads(next(file))
             arrivals = json.loads(next(file))
             delays   = json.loads(next(file))
             sizes    = json.loads(next(file))
 
-            return arrivals, delays, sizes
+            return arrivals, delays, sizes, loss
 
     except IOError as error:
         raise DataError('Failed to read flow\'s data from the file %s:\n%s' % (filePath, error))
