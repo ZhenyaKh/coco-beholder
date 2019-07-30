@@ -22,7 +22,7 @@ TYPE                 = 'type'
 EXIT_SUCCESS         = 0
 EXIT_FAILURE         = 1
 SUCCESS_MESSAGE      = "SUCCESS"
-FAILURE_MESSAGE       = "FAILURE"
+FAILURE_MESSAGE      = "FAILURE"
 
 
 #
