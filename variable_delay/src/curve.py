@@ -180,22 +180,22 @@ class Curve(object):
 
     #
     # Method finds the label notation for averaged rate graph
-    # param [in] type - type of graph
+    # param [in] graphType - type of graph
     # returns the label notation
     #
     @staticmethod
-    def avg_rate_label_notation(type):
-        return '{} (<average throughput>)'.format(type.get_label_notation_prefix())
+    def avg_rate_label_notation(graphType):
+        return '{} (<average throughput>)'.format(graphType.get_label_notation_prefix())
 
 
     #
     # Method finds the label notation for averaged delay graph
-    # param [in] type - type of graph
+    # param [in] graphType - type of graph
     # returns the label notation
     #
     @staticmethod
-    def avg_delay_label_notation(type):
-        return '{} (<average delay>)'.format(type.get_label_notation_prefix())
+    def avg_delay_label_notation(graphType):
+        return '{} (<average delay>)'.format(graphType.get_label_notation_prefix())
 
 
     #
