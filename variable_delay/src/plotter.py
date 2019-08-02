@@ -241,7 +241,7 @@ class Plotter(object):
         ax.set_xlim(self.get_slotted_graph_x_limit())
         ax.set_xlabel('Time (s), aggregation interval %gs' % self.slotSec, fontsize=FONT_SIZE)
         ax.set_ylabel('Jain\'s index',                                     fontsize=FONT_SIZE)
-        ax.set_title(self.jainIndex.get_label_notation(), loc='right',     fontsize=FONT_SIZE)
+        ax.set_title (self.get_avg_jain_index_graph_title(), loc='right',  fontsize=FONT_SIZE)
         ax.grid()
 
         handles, labels = ax.get_legend_handles_labels()
@@ -298,18 +298,23 @@ class Plotter(object):
     # returns the title of the graph
     #
     def get_avg_rate_graph_title(self):
-        return '{} {}'.format(self.type.     get_label_notation_prefix(),
-                              self.curves[0].avg_rate_label_notation_postfix())
+        return self.curves[0].avg_rate_label_notation(self.type)
 
 
     #
     # Method gets the title of the averaged delay graph
     # returns the title of the graph
     #
-
     def get_avg_delay_graph_title(self):
-        return '{} {}'.format(self.type.     get_label_notation_prefix(),
-                              self.curves[0].avg_delay_label_notation_postfix())
+        return self.curves[0].avg_delay_label_notation(self.type)
+
+
+    #
+    # Method gets the title of the averaged Jain's index graph
+    # returns the title of the graph
+    #
+    def get_avg_jain_index_graph_title(self):
+        return self.jainIndex.get_label_notation()
 
 
     #

@@ -179,21 +179,23 @@ class Curve(object):
 
 
     #
-    # Method finds the postfix of the label notation for averaged rate graph
-    # returns the postfix of the label notation
+    # Method finds the label notation for averaged rate graph
+    # param [in] type - type of graph
+    # returns the label notation
     #
     @staticmethod
-    def avg_rate_label_notation_postfix():
-        return '(<average throughput>)'
+    def avg_rate_label_notation(type):
+        return '{} (<average throughput>)'.format(type.get_label_notation_prefix())
 
 
     #
-    # Method finds the postfix of the label notation for averaged delay graph
-    # returns the postfix of the label notation
+    # Method finds the label notation for averaged delay graph
+    # param [in] type - type of graph
+    # returns the label notation
     #
     @staticmethod
-    def avg_delay_label_notation_postfix():
-        return '(<average delay>)'
+    def avg_delay_label_notation(type):
+        return '{} (<average delay>)'.format(type.get_label_notation_prefix())
 
 
     #
