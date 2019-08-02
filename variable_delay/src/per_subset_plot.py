@@ -32,8 +32,15 @@ class PerSubsetPlot(PlotType):
                 raise PlotTypeError('This is not a layout field allowed: \'%s\'\n'
                                     'Allowed fields: %s'% (field, PerSubsetPlot.ALLOWED_FIELDS))
 
-        self.fields = fields                         # layout fields to divide flows
-        self.name   = 'per-' + '-'.join(self.fields) # name of the type of plots/stats
+        # name of the type of plots/stats
+        self.name = 'per-' + '-'.join(fields)
+
+        # layout fields to divide flows
+        self.fields = fields
+
+        # curve's label prefix notation
+        self.notation = 'Label notation: <{}> : <flows number> flows'.\
+            format('> <'.join(self.fields))
 
 
     #

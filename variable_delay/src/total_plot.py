@@ -16,7 +16,8 @@ class TotalPlot(PlotType):
     #
     def __init__(self):
         PlotType.__init__(self)
-        self.name = 'total' # name of the type of plots/stats
+        self.name     = 'total'                             # name of the type of plots/stats
+        self.notation = 'Total: <total flows number> flows' # curve's label prefix notation
 
 
     #

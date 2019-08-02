@@ -14,7 +14,11 @@ class PerFlowPlot(PlotType):
     #
     def __init__(self):
         PlotType.__init__(self)
-        self.name = 'per-flow' # name of the type of plots/stats
+        # name of the type of plots/stats
+        self.name = 'per-flow'
+
+        # curve's label prefix notation
+        self.notation = 'Label notation: Flow <flow id>: <scheme> <direction>'
 
 
     #

@@ -174,12 +174,12 @@ class Plotter(object):
         locator = plticker.MultipleLocator(base=1)          # enforce tick for each second on x axis
         ax.xaxis.set_major_locator(locator)
 
-        ax.grid()
         ax.set_xlim(self.get_slotted_graph_x_limit())
-        ax.set_xlabel('Time (s), interval %gs' % self.slotSec,           fontsize=FONT_SIZE)
-        ax.set_ylabel('Throughput (Mbit/s)',                             fontsize=FONT_SIZE)
-        ax.set_title ('In ( ): the curve\'s overall average throughput', fontsize=FONT_SIZE,
-                                                                         loc='right')
+        ax.set_xlabel('Time (s), aggregation interval %gs' % self.slotSec, fontsize=FONT_SIZE)
+        ax.set_ylabel('Throughput (Mbit/s)',                               fontsize=FONT_SIZE)
+        ax.set_title (self.get_avg_rate_graph_title(), loc='right',        fontsize=FONT_SIZE)
+        ax.grid()
+
         handles, labels = ax.get_legend_handles_labels()
 
         legend = ax.legend(Plotter.flip(handles, LABELS_IN_ROW),
@@ -207,9 +207,9 @@ class Plotter(object):
         ax.xaxis.set_major_locator(locator)
 
         ax.set_xlim(self.get_slotted_graph_x_limit())
-        ax.set_xlabel('Time (s), interval %gs' % self.slotSec,                   fontsize=FONT_SIZE)
-        ax.set_ylabel('One-way delay (ms)',                                      fontsize=FONT_SIZE)
-        ax.set_title ('In ( ): the curve\'s overall average delay', loc='right', fontsize=FONT_SIZE)
+        ax.set_xlabel('Time (s), aggregation interval %gs' % self.slotSec, fontsize=FONT_SIZE)
+        ax.set_ylabel('One-way delay (ms)',                                fontsize=FONT_SIZE)
+        ax.set_title (self.get_avg_delay_graph_title(), loc='right',       fontsize=FONT_SIZE)
         ax.grid()
 
         handles, labels = ax.get_legend_handles_labels()
@@ -238,12 +238,12 @@ class Plotter(object):
         locator = plticker.MultipleLocator(base=1)          # enforce tick for each second on x axis
         ax.xaxis.set_major_locator(locator)
 
-        ax.grid()
         ax.set_xlim(self.get_slotted_graph_x_limit())
-        ax.set_xlabel('Time (s), interval %gs' % self.slotSec,                   fontsize=FONT_SIZE)
-        ax.set_ylabel('Jain\'s index',                                           fontsize=FONT_SIZE)
-        ax.set_title ('In ( ): index over curves\' overall average throughputs', fontsize=FONT_SIZE,
-                                                                                 loc='right')
+        ax.set_xlabel('Time (s), aggregation interval %gs' % self.slotSec, fontsize=FONT_SIZE)
+        ax.set_ylabel('Jain\'s index',                                     fontsize=FONT_SIZE)
+        ax.set_title(self.jainIndex.get_label_notation(), loc='right',     fontsize=FONT_SIZE)
+        ax.grid()
+
         handles, labels = ax.get_legend_handles_labels()
 
         legend = ax.legend(Plotter.flip(handles, LABELS_IN_ROW),
@@ -291,6 +291,25 @@ class Plotter(object):
             marker = None
 
         return marker
+
+
+    #
+    # Method gets the title of the averaged rate graph
+    # returns the title of the graph
+    #
+    def get_avg_rate_graph_title(self):
+        return '{} {}'.format(self.type.     get_label_notation_prefix(),
+                              self.curves[0].avg_rate_label_notation_postfix())
+
+
+    #
+    # Method gets the title of the averaged delay graph
+    # returns the title of the graph
+    #
+
+    def get_avg_delay_graph_title(self):
+        return '{} {}'.format(self.type.     get_label_notation_prefix(),
+                              self.curves[0].avg_delay_label_notation_postfix())
 
 
     #

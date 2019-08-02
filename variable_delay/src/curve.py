@@ -15,20 +15,20 @@ class Curve(object):
     # param [in] name  - the name of the curve
     #
     def __init__(self, flows, name):
-        self.flows = flows        # flows of the curve
-        self.name  = name         # name of the curve
+        self.flows         = flows # flows of the curve
+        self.name          = name  # name of the curve
 
-        self.start         = None # curve's duration start time
-        self.end           = None # curve's duration end time
+        self.start         = None  # curve's duration start time
+        self.end           = None  # curve's duration end time
 
-        self.slottedPkts   = None # curve's slotted packets
-        self.slottedDelays = None # curve's slotted delays
-        self.slottedBytes  = None # curve's slotted bytes
-        self.slottedRates  = None # curve's slotted rates
+        self.slottedPkts   = None  # curve's slotted packets
+        self.slottedDelays = None  # curve's slotted delays
+        self.slottedBytes  = None  # curve's slotted bytes
+        self.slottedRates  = None  # curve's slotted rates
 
-        self.curveAvgRate  = None # curve's average rate stats
-        self.curveAvgDelay = None # curve's average delay stats
-        self.curveLoss     = None # curve's loss percentage
+        self.curveAvgRate  = None  # curve's average rate stats
+        self.curveAvgDelay = None  # curve's average delay stats
+        self.curveLoss     = None  # curve's loss percentage
 
         # to ensure that compute_time_bounds is called before any other methods
         del self.start
@@ -176,6 +176,24 @@ class Curve(object):
             valueStr = '{:.2f} ms'.format(self.curveAvgDelay)
 
         return '{} ({})'.format(self.name, valueStr)
+
+
+    #
+    # Method finds the postfix of the label notation for averaged rate graph
+    # returns the postfix of the label notation
+    #
+    @staticmethod
+    def avg_rate_label_notation_postfix():
+        return '(<average throughput>)'
+
+
+    #
+    # Method finds the postfix of the label notation for averaged delay graph
+    # returns the postfix of the label notation
+    #
+    @staticmethod
+    def avg_delay_label_notation_postfix():
+        return '(<average delay>)'
 
 
     #

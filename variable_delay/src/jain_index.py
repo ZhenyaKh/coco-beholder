@@ -65,6 +65,16 @@ class JainIndex(object):
 
 
     #
+    # Method finds the label notation for Jain's index graph
+    # returns the label notation
+    #
+    @staticmethod
+    def get_label_notation():
+        return 'Label notation: All <curves number> curves ' \
+               '(Jain\'s index over average throughputs of the curves)'
+
+
+    #
     # Method generates the statistics string for the averaged Jain index
     # returns the statistics string
     #

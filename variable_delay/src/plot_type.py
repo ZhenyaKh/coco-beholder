@@ -15,7 +15,8 @@ class PlotType(object):
     # Constructor
     #
     def __init__(self):
-        self.name = None # name of the type of plots/stats
+        self.name     = None # name of the type of plots/stats
+        self.notation = None # curve's label prefix notation
         pass
 
 
@@ -35,3 +36,11 @@ class PlotType(object):
     #
     def get_filename_prefix(self):
         return self.name
+
+
+    #
+    # Method returns the prefix of the label notation of curves in plots of the type.
+    # returns prefix of the label notation
+    #
+    def get_label_notation_prefix(self):
+        return self.notation
