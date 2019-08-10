@@ -66,10 +66,7 @@ globalClientCmds = [] # Global array of commands to launch clients -- for multip
 # Global function which launches flow's client -- for multiprocessing map
 #
 def start_client(flowId):
-    print(flowId)
-    x = globalClients[flowId].popen(globalClientCmds[flowId]).pid
-    print("%f" % time.time())
-    return x
+    return globalClients[flowId].popen(globalClientCmds[flowId]).pid
 
 
 #
@@ -466,10 +463,6 @@ class Test(object):
     # returns multiprocessing pool
     #
     def start_pool(self):
-        print(self.startsSchedule)
-        print("!!!!", len(max(self.startsSchedule, key=lambda x: len(x))))
-        print(min(cpu_count() - 1, len(max(self.startsSchedule, key=lambda x: len(x)))))
-
         originalSigintHandler = signal.signal(signal.SIGINT, signal.SIG_IGN)
 
         pool = Pool(min(cpu_count() - 1, len(max(self.startsSchedule, key=lambda x: len(x)))))
@@ -486,7 +479,6 @@ class Test(object):
         benchmarkStart = timeStart = time.time() # TODO: remove benchmark
 
         self.clientPids.extend(self.pool.map(start_client, self.startsSchedule[0]))
-        print("!", time.time() - benchmarkStart)
 
         self.startEvent.set()
 
@@ -494,7 +486,6 @@ class Test(object):
             sleep(SECOND - ((time.time() - timeStart) % SECOND))
 
             self.clientPids.extend(self.pool.map(start_client, self.startsSchedule[i]))
-            print("#", time.time())
 
         print("debug benchmark 1: %f" % (time.time() - benchmarkStart))
 
