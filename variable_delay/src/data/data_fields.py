@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from variable_delay.src import metadata_fields
-from variable_delay.src import layout_fields
+from variable_delay.src.metadata import metadata_fields
+from variable_delay.src.layout import layout_fields
 
 # common data
 RUNTIME   = metadata_fields.RUNTIME

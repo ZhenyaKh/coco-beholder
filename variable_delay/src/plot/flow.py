@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from variable_delay.src.data import get_duration, load_data, load_delays, DataError
+from variable_delay.src.data.data import get_duration, load_data, load_delays, DataError
 
 #
 # Class the instance of which is a flow with data to plot

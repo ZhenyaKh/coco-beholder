@@ -6,7 +6,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
 
-from variable_delay.src.plot_utils import get_x_limit, get_marker, flip
+from variable_delay.src.plot.plot_utils import get_x_limit, get_marker, flip
 
 AVERAGE_JAIN    = 'avg-jain'
 PLOTS_EXTENSION = 'png'

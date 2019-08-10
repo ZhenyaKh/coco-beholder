@@ -6,11 +6,12 @@ import os
 import argparse
 import pwd
 
-from variable_delay.src.help_formatter import BlankLinesHelpFormatter
-from variable_delay.src.test import test
-from variable_delay.src.metadata import compute_metadata, save_metadata, MetadataError
-from variable_delay.src.layout import parse_layout, save_default_layout, parse_time_str, LayoutError
-from variable_delay.src.args_names import *
+from variable_delay.src.argparse.help_formatter import BlankLinesHelpFormatter
+from variable_delay.src.test.test import test
+from variable_delay.src.metadata.metadata import compute_metadata, save_metadata, MetadataError
+from variable_delay.src.layout.layout import parse_layout, save_default_layout, parse_time_str
+from variable_delay.src.layout.layout import LayoutError
+from variable_delay.src.processed_args.args_names import *
 
 KIB_IN_MIB          = 1024
 SUDO_USER           = 'SUDO_USER'

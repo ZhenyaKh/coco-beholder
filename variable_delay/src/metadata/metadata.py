@@ -3,9 +3,9 @@
 import os
 import json
 
-from variable_delay.src.layout_fields import FLOWS, START
-from variable_delay.src import args_names
-from variable_delay.src import metadata_fields
+from variable_delay.src.layout.layout_fields import FLOWS, START
+from variable_delay.src.processed_args import args_names
+from variable_delay.src.metadata import metadata_fields
 
 METADATA_NAME = 'metadata.json'
 

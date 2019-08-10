@@ -3,16 +3,16 @@
 import gc
 import math
 
-from variable_delay.src.metadata import load_metadata, MetadataError
-from variable_delay.src.metadata_fields import ALL_FLOWS, SORTED_LAYOUT
-from variable_delay.src.data import DataError
-from variable_delay.src.flow import Flow
-from variable_delay.src.average_rate import AverageRate
-from variable_delay.src.average_delay import AverageDelay
-from variable_delay.src.jain_index import JainIndex
-from variable_delay.src.loss import Loss
-from variable_delay.src.per_packet_delay import PerPacketDelay
-from variable_delay.src.stats_writer import StatsWriter, StatsWriterError
+from variable_delay.src.metadata.metadata import load_metadata, MetadataError
+from variable_delay.src.metadata.metadata_fields import ALL_FLOWS, SORTED_LAYOUT
+from variable_delay.src.data.data import DataError
+from variable_delay.src.plot.flow import Flow
+from variable_delay.src.plot.average_rate import AverageRate
+from variable_delay.src.plot.average_delay import AverageDelay
+from variable_delay.src.plot.jain_index import JainIndex
+from variable_delay.src.plot.loss import Loss
+from variable_delay.src.plot.per_packet_delay import PerPacketDelay
+from variable_delay.src.plot.stats_writer import StatsWriter, StatsWriterError
 
 
 #

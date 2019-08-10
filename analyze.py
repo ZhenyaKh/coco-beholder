@@ -4,8 +4,9 @@ import sys
 import os
 import argparse
 
-from variable_delay.src.help_formatter import BlankLinesHelpFormatter
-from variable_delay.src.dump_analyzer import DumpAnalyzer, MetadataError, AnalysisError, DataError
+from variable_delay.src.argparse.help_formatter import BlankLinesHelpFormatter
+from variable_delay.src.analyze.dump_analyzer import DumpAnalyzer
+from variable_delay.src.analyze.dump_analyzer import MetadataError, AnalysisError, DataError
 
 WORKING_DIR          = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_IN_DIR_NAME  = 'dumps'

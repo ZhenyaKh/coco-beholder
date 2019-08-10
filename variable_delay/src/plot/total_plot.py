@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from variable_delay.src.plot_type import PlotType
-from variable_delay.src.curve import Curve
+from variable_delay.src.plot.plot_type import PlotType
+from variable_delay.src.plot.curve import Curve
 
 FLOW  = 'flow'
 FLOWS = 'flows'

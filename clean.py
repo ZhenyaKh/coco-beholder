@@ -4,7 +4,7 @@ import argparse
 import sys
 import os
 
-from variable_delay.src.help_formatter import BlankLinesHelpFormatter
+from variable_delay.src.argparse.help_formatter import BlankLinesHelpFormatter
 
 SENDER                  = 'sender'
 RECEIVER                = 'receiver'

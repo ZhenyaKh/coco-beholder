@@ -7,14 +7,14 @@ import hashlib
 from dpkt.pcap import Reader
 from dpkt.ethernet import Ethernet
 
-from variable_delay.src.metadata import load_metadata, save_metadata, MetadataError
-from variable_delay.src.metadata_fields import RUNTIME, ALL_FLOWS, SORTED_LAYOUT
-from variable_delay.src.layout_fields import FLOWS, DIRECTION, SCHEME
-from variable_delay.src.layout import RIGHTWARD, compute_per_flow
-from variable_delay.src.pantheon_constants import RECEIVER, SENDER
-from variable_delay.src.progress_bar import ProgressBar
-from variable_delay.src.data import save_data, DataError
-from variable_delay.src.data_fields import *
+from variable_delay.src.metadata.metadata import load_metadata, save_metadata, MetadataError
+from variable_delay.src.metadata.metadata_fields import RUNTIME, ALL_FLOWS, SORTED_LAYOUT
+from variable_delay.src.layout.layout_fields import FLOWS, DIRECTION, SCHEME
+from variable_delay.src.layout.layout import RIGHTWARD, compute_per_flow
+from variable_delay.src.pantheon.pantheon_constants import RECEIVER, SENDER
+from variable_delay.src.analyze.progress_bar import ProgressBar
+from variable_delay.src.data.data import save_data, DataError
+from variable_delay.src.data.data_fields import *
 
 MS_IN_SEC = 1000
 UTF8      = 'utf-8'

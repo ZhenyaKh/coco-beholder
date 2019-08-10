@@ -4,11 +4,11 @@ import sys
 import os
 import argparse
 
-from variable_delay.src.help_formatter import BlankLinesHelpFormatter
-from variable_delay.src.per_flow_plot import PerFlowPlot
-from variable_delay.src.total_plot import TotalPlot
-from variable_delay.src.per_subset_plot import PerSubsetPlot, PlotTypeError
-from variable_delay.src.plotter import Plotter, MetadataError, DataError, StatsWriterError
+from variable_delay.src.argparse.help_formatter import BlankLinesHelpFormatter
+from variable_delay.src.plot.per_flow_plot import PerFlowPlot
+from variable_delay.src.plot.total_plot import TotalPlot
+from variable_delay.src.plot.per_subset_plot import PerSubsetPlot, PlotTypeError
+from variable_delay.src.plot.plotter import Plotter, MetadataError, DataError, StatsWriterError
 
 WORKING_DIR          = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_IN_DIR_NAME  = os.path.join('graphs', 'data')

@@ -19,11 +19,11 @@ from variable_delay.third_party.mininet.moduledeps import pathCheck
 from variable_delay.third_party.mininet.net import Mininet
 from variable_delay.third_party.mininet.net import CLI
 
-from variable_delay.src.metadata import load_metadata, MetadataError
-from variable_delay.src.layout import LEFTWARD, compute_per_flow
-from variable_delay.src.metadata_fields import *
-from variable_delay.src.layout_fields import *
-from variable_delay.src.pantheon_constants import *
+from variable_delay.src.metadata.metadata import load_metadata, MetadataError
+from variable_delay.src.metadata.metadata_fields import *
+from variable_delay.src.layout.layout import LEFTWARD, compute_per_flow
+from variable_delay.src.layout.layout_fields import *
+from variable_delay.src.pantheon.pantheon_constants import *
 
 SUPERNET_SIZE       = 16
 SUBNET_SIZE         = 2

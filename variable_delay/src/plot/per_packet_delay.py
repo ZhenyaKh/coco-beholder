@@ -7,7 +7,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
 
-from variable_delay.src.plot_utils import flip
+from variable_delay.src.plot.plot_utils import flip
 
 PPT_DELAY        = 'ppt-delay'
 PLOTS_EXTENSION  = 'png'

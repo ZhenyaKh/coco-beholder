@@ -5,8 +5,8 @@ import subprocess
 
 import yaml
 
-from variable_delay.src.pantheon_constants import *
-from variable_delay.src.layout_fields import *
+from variable_delay.src.pantheon.pantheon_constants import *
+from variable_delay.src.layout.layout_fields import *
 
 LEFTWARD           = '<-'
 RIGHTWARD          = '->'

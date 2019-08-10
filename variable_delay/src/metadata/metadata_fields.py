@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from variable_delay.src import args_names
+from variable_delay.src.processed_args import args_names
 
 RATE          = args_names.RATE
 RUNTIME       = args_names.RUNTIME

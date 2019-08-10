@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-from variable_delay.src.plot_type import PlotType
-from variable_delay.src.layout import compute_per_flow
-from variable_delay.src.layout_fields import SCHEME, DIRECTION
-from variable_delay.src.curve import Curve
+from variable_delay.src.plot.plot_type import PlotType
+from variable_delay.src.layout.layout import compute_per_flow
+from variable_delay.src.layout.layout_fields import SCHEME, DIRECTION
+from variable_delay.src.plot.curve import Curve
 
 #
 # Class of per-flow plots/stats
