@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import itertools
+
 #
 # Class the instance of which is a curve to plot
 #
@@ -108,3 +110,22 @@ class Curve(object):
 
         del self.lostSentBytes
         del self.allSentBytes
+
+
+    #
+    # Method gets arrays of arrival timestamps and of delays of all the packets of the curve
+    # param [in] directory - input directory containing the log data-files
+    # returns arrival timestamps and delays of the packets of the curve
+    # throws DataError
+    #
+    def get_delays(self, directory):
+        curveArrivals = []
+        curveDelays   = []
+
+        for flow in self.flows:
+            flowArrivals, flowDelays = flow.get_delays(directory)
+
+            curveArrivals.append(flowArrivals)
+            curveDelays  .append(flowDelays)
+
+        return list(itertools.chain(*curveArrivals)), list(itertools.chain(*curveDelays))

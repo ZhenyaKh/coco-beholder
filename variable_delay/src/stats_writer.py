@@ -62,6 +62,28 @@ class StatsWriter(object):
 
 
     #
+    # Method writes per-packet stats to the stats file
+    # param [in] perPacketDelay - per-packet delay whose stats should be saved
+    # throws StatsWriterError
+    #
+    def write_per_packet(self, perPacketDelay):
+        self.mode = WRITE_MODE
+
+        self.save_per_packet(perPacketDelay)
+
+
+    #
+    # Method appends per-packet stats to the stats file
+    # param [in] perPacketDelay - per-packet delay whose stats should be saved
+    # throws StatsWriterError
+    #
+    def append_per_packet(self, perPacketDelay):
+        self.mode = APPEND_MODE
+
+        self.save_per_packet(perPacketDelay)
+
+
+    #
     # Method saves average stats to the stats file in the chosen writing mode
     # param [in] averageRate  - average rate whose stats should be saved
     # param [in] averageDelay - average delay whose stats should be saved
@@ -70,7 +92,7 @@ class StatsWriter(object):
     # throws StatsWriterError
     #
     def save_average(self, averageRate, averageDelay, jainIndex, loss):
-        output = ''
+        output = '== Average and loss statistics ==\n\n'
 
         output += '{}\n\n'.format(jainIndex.get_stats_string())
 
@@ -85,3 +107,24 @@ class StatsWriter(object):
         except IOError as error:
             raise StatsWriterError(
                 'Failed to save average statistics to the file %s:\n%s' % (self.path, error))
+
+
+    #
+    # Method saves per-packet stats to the stats file in the chosen writing mode
+    # param [in] perPacketDelay - per-packet delay whose stats should be saved
+    # throws StatsWriterError
+    #
+    def save_per_packet(self, perPacketDelay):
+        output = '===== Per-packet statistics =====\n\n'
+
+        for curve in self.curves:
+            output += '-- Curve "{}":\n'.format(curve.name)
+            output += '{}\n'          .format(perPacketDelay .get_median_stats_string      (curve))
+            output += '{}\n'          .format(perPacketDelay .get_average_stats_string     (curve))
+            output += '{}\n\n'        .format(perPacketDelay .get_95percentile_stats_string(curve))
+        try:
+            with open(self.path, self.mode) as file:
+                file.write(output)
+        except IOError as error:
+            raise StatsWriterError(
+                'Failed to save per-packet statistics to the file %s:\n%s' % (self.path, error))

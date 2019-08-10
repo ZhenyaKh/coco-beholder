@@ -54,7 +54,7 @@ def save_data(directory, flow, arrivals, delays, sizes, loss):
 # returns timestamps of flow's data first and last arrivals
 # throws DataError
 #
-def get_data_duration(directory, flow):
+def get_duration(directory, flow):
     filePath = os.path.join(directory, "{}-{:d}.{}".format(DATA, flow, LOG))
 
     try:
@@ -90,3 +90,26 @@ def load_data(directory, flow):
 
     except IOError as error:
         raise DataError('Failed to read flow\'s data from the file %s:\n%s' % (filePath, error))
+
+
+#
+# Function reads arrival timestamps and delays of the flow's packets from the data log file.
+# param [in] directory - input directory containing the log file
+# param [in] flow      - flow index
+# returns timestamps of arrivals of the flow's packets, one-way delays of the flow's packets
+# throws DataError
+#
+def load_delays(directory, flow):
+    filePath = os.path.join(directory, "{}-{:d}.{}".format(DATA, flow, LOG))
+
+    try:
+        with open(filePath, 'r') as file:
+            _        = json.loads(next(file))
+            _        = json.loads(next(file))
+            arrivals = json.loads(next(file))
+            delays   = json.loads(next(file))
+
+            return arrivals, delays
+
+    except IOError as error:
+        raise DataError('Failed to read flow\'s delays from the file %s:\n%s' % (filePath, error))

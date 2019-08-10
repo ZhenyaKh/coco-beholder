@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from variable_delay.src.data import get_data_duration, load_data, DataError
+from variable_delay.src.data import get_duration, load_data, load_delays, DataError
 
 #
 # Class the instance of which is a flow with data to plot
@@ -27,7 +27,7 @@ class Flow(object):
     # throws DataError
     #
     def compute_time_bounds(self, directory):
-        self.start, self.end = get_data_duration(directory, self.id + 1)
+        self.start, self.end = get_duration(directory, self.id + 1)
 
 
     #
@@ -66,6 +66,16 @@ class Flow(object):
 
         del self.lostSentBytes
         del self.allSentBytes
+
+
+    #
+    # Method gets arrays of arrival timestamps and of delays of all the packets of the flow
+    # param [in] directory - input directory containing the log data-file of the flow
+    # returns arrival timestamps and delays of the packets of the flow
+    # throws DataError
+    #
+    def get_delays(self, directory):
+        return load_delays(directory, self.id + 1)
 
 
     #

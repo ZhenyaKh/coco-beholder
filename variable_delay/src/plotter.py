@@ -11,6 +11,7 @@ from variable_delay.src.average_rate import AverageRate
 from variable_delay.src.average_delay import AverageDelay
 from variable_delay.src.jain_index import JainIndex
 from variable_delay.src.loss import Loss
+from variable_delay.src.per_packet_delay import PerPacketDelay
 from variable_delay.src.stats_writer import StatsWriter, StatsWriterError
 
 
@@ -20,10 +21,10 @@ from variable_delay.src.stats_writer import StatsWriter, StatsWriterError
 class Plotter(object):
     #
     # Constructor
-    # param[in] inDir    - full path of directory with input data-files
-    # param[in] outDir   - full path of output directory for graphs and stats
-    # param[in] interval - interval in seconds per which average graphs are averaged
-    # param[in] plotType - type of graphs and stats to make
+    # param [in] inDir    - full path of directory with input data-files
+    # param [in] outDir   - full path of output directory for graphs and stats
+    # param [in] interval - interval in seconds per which average graphs are averaged
+    # param [in] plotType - type of graphs and stats to make
     # throws MetadataError
     #
     def __init__(self, inDir, outDir, interval, plotType):
@@ -47,6 +48,8 @@ class Plotter(object):
         self.generate_average()
 
         gc.collect()
+
+        self.generate_per_packet()
 
 
     #
@@ -80,6 +83,20 @@ class Plotter(object):
         statsWriter.write_average(averageRate, averageDelay, jainIndex, Loss(self.curves))
 
         self.free_curves_data()
+
+
+    #
+    # Method generates per packet plots/stats: per packet one-way delay
+    # throws DataError, StatsWriterError
+    #
+    def generate_per_packet(self):
+        print('Plotting per packet one-way delay...')
+        perPacketDelay = PerPacketDelay(self.inDir, self.outDir, self.type, self.curves)
+        perPacketDelay.plot()
+
+        print('Saving per-packet statistics...')
+        statsWriter = StatsWriter(self.outDir, self.type, self.curves)
+        statsWriter.append_per_packet(perPacketDelay)
 
 
     #
