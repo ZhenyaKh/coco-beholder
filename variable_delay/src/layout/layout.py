@@ -295,7 +295,7 @@ def parse_item_scheme(item, index, allSchemes):
 #
 def load_layout_file(layoutPath):
     try:
-        return yaml.full_load(open(layoutPath, 'r'))
+        return yaml.safe_load(open(layoutPath, 'r'))
     except Exception as error:
         raise LayoutError("Failed to load layout yaml-file:\n%s" % error)
 
@@ -311,7 +311,7 @@ def load_pantheon_config(pantheonDir):
 
     try:
         with open(pantheonPath) as pantheonConfig:
-            return yaml.full_load(pantheonConfig)[PANTHEON_SCHEMES].keys()
+            return yaml.safe_load(pantheonConfig)[PANTHEON_SCHEMES].keys()
     except Exception as error:
         raise LayoutError("Failed to load Pantheon configuration file:\n%s" % error)
 

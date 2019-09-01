@@ -439,14 +439,15 @@ class Test(object):
                 server = self.rightHosts[i]
                 client = self.leftHosts [i]
 
-            schemePath = self.schemePaths[self.schemes[i]]
+            scheme     = self.schemes[i]
+            schemePath = self.schemePaths[scheme]
 
             serverPid = server.popen(
                 ['sudo', '-u', self.user, schemePath, self.runsFirst[i], str(PORT)]).pid
 
             self.serverPids.append(serverPid)
 
-            Test.wait_for_server(server)
+            Test.wait_for_server(server, i, scheme)
 
             runsSecond = RECEIVER if self.runsFirst[i] == SENDER else SENDER
 
@@ -668,9 +669,11 @@ class Test(object):
     # Method ensures that server really got started on the port. Maybe, this is not the best way
     # but in Pantheon they just sleep for three seconds after opening all the servers.
     # param [in] server - server to check
+    # param [in] flow   - flow index
+    # param [in] scheme - scheme name
     #
     @staticmethod
-    def wait_for_server(server):
+    def wait_for_server(server, flow, scheme):
         timeStart = time.time()
 
         while True:
@@ -680,8 +683,8 @@ class Test(object):
                 return
 
             if time.time() - timeStart > TIMEOUT_SEC:
-                raise TestError("Server failed to start by timeout. Output of lsof command:\n%s" %
-                                output)
+                raise TestError('Server failed to start by timeout: flow {:d}, scheme {}. '
+                                'Output of lsof command:\n{}'.format(flow, scheme, output))
 
 
     #
