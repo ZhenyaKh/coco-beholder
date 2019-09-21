@@ -7,6 +7,24 @@ import itertools
 #
 class Curve(object):
     #
+    # float time interval in seconds -- slot -- per which average graphs are averaged
+    #
+    SLOT_SEC = None
+
+
+    #
+    # number of slots
+    #
+    SLOTS_NUMBER = None
+
+
+    #
+    # full path of directory with input data-files
+    #
+    IN_DIR = None
+
+
+    #
     # Constructor
     # param [in] flows - flows constituting the curve
     # param [in] name  - the name of the curve
@@ -32,15 +50,14 @@ class Curve(object):
 
     #
     # Method computes the curve's data first and last arrivals
-    # param [in] directory - input directory containing the log files
     # throws DataError
     #
-    def compute_time_bounds(self, directory):
+    def compute_time_bounds(self):
         minStart = None
         maxEnd   = None
 
         for flow in self.flows:
-            flow.compute_time_bounds(directory)
+            flow.compute_time_bounds(Curve.IN_DIR)
 
             if flow.start is not None:
                 if minStart is None:
@@ -66,22 +83,19 @@ class Curve(object):
 
     #
     # Method computes average data for the curve
-    # param [in] directory   - input directory containing the log files
-    # param [in] slotsNumber - number of slots
-    # param [in] slotSec     - float slot size in seconds
     # throws DataError
     #
-    def compute_average_data(self, directory, slotsNumber, slotSec):
+    def compute_average_data(self):
         for flow in self.flows:
-            flow.compute_average_data(directory, slotsNumber, slotSec)
+            flow.compute_average_data(Curve.IN_DIR, Curve.SLOTS_NUMBER, Curve.SLOT_SEC)
             self.lostSentBytes += flow.lostSentBytes
             self.allSentBytes  += flow.allSentBytes
 
-        self.slottedPkts   = [0] * slotsNumber
-        self.slottedDelays = [0] * slotsNumber
-        self.slottedBytes  = [0] * slotsNumber
+        self.slottedPkts   = [0] * Curve.SLOTS_NUMBER
+        self.slottedDelays = [0] * Curve.SLOTS_NUMBER
+        self.slottedBytes  = [0] * Curve.SLOTS_NUMBER
 
-        for slotId in range(slotsNumber):
+        for slotId in range(Curve.SLOTS_NUMBER):
             for flow in self.flows:
                 self.slottedPkts[slotId]   += flow.slottedPkts[slotId]
                 self.slottedDelays[slotId] += flow.slottedDelays[slotId]
@@ -114,16 +128,15 @@ class Curve(object):
 
     #
     # Method gets arrays of arrival timestamps and of delays of all the packets of the curve
-    # param [in] directory - input directory containing the log data-files
     # returns arrival timestamps and delays of the packets of the curve
     # throws DataError
     #
-    def get_delays(self, directory):
+    def get_delays(self):
         curveArrivals = []
         curveDelays   = []
 
         for flow in self.flows:
-            flowArrivals, flowDelays = flow.get_delays(directory)
+            flowArrivals, flowDelays = flow.get_delays(Curve.IN_DIR)
 
             curveArrivals.append(flowArrivals)
             curveDelays  .append(flowDelays)

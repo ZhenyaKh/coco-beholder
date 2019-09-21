@@ -24,16 +24,17 @@ BITS_IN_MBITS    = 1000000
 class AverageRate(object):
     #
     # Constructor
-    # param [in] outDir   - full path of output directory for graphs and stats
-    # param [in] plotType - type of graphs and stats to make
-    # param [in] curves   - list of curves to plot
-    # param [in] slotSec  - float slot size in seconds
+    # param [in] outDir     - full path of output directory for graphs and stats
+    # param [in] plotType   - type of graphs and stats to make
+    # param [in] curves     - list of curves to plot
+    # param [in] colorCycle - color cycle for curves
     #
-    def __init__(self, outDir, plotType, curves, slotSec):
+    def __init__(self, outDir, plotType, curves, colorCycle):
         self.curves        = curves                               # curves to plot
-        self.slotSec       = float(slotSec)                       # float slot size in seconds
+        self.slotSec       = curves[0].SLOT_SEC                   # float slot size in seconds
+        self.slotsNumber   = curves[0].SLOTS_NUMBER               # number of slots
+        self.colorCycle    = colorCycle                           # color cycle for curves
         self.labelNotation = plotType.get_label_notation_prefix() # label notation's prefix
-        self.slotsNumber   = len(curves[0].slottedPkts)           # number of slots
         self.statsRates    = { }                                  # per curve: average rate stats
         self.slottedRates  = { }                                  # per curve: slotted rates
 
@@ -50,6 +51,7 @@ class AverageRate(object):
     #
     def plot(self):
         figure, ax = plt.subplots(figsize=(16, 9))
+        ax.set_prop_cycle(self.colorCycle)
 
         for curve in self.curves:
             xData, yData = self.get_data(curve)
@@ -74,6 +76,14 @@ class AverageRate(object):
         figure.savefig(self.path, bbox_extra_artists=(legend,), bbox_inches='tight', pad_inches=0.2)
 
         plt.close(figure)
+
+
+    #
+    # Method gets the curves
+    # returns the curves
+    #
+    def get_curves(self):
+        return self.curves
 
 
     #

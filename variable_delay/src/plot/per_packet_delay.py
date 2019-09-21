@@ -21,15 +21,15 @@ FONT_SIZE        = 12
 class PerPacketDelay(object):
     #
     # Constructor
-    # param [in] inDir    - full path of directory with input data-files
-    # param [in] outDir   - full path of output directory for graphs and stats
-    # param [in] plotType - type of graphs and stats to make
-    # param [in] curves   - list of curves to plot
+    # param [in] outDir     - full path of output directory for graphs and stats
+    # param [in] plotType   - type of graphs and stats to make
+    # param [in] curves     - list of curves to plot
+    # param [in] colorCycle - color cycle for curves
     #
-    def __init__(self, inDir, outDir, plotType, curves):
-        self.inDir          = inDir                                # directory with input data-files
-        self.curves         = curves                               # curves to plot
-        self.labelNotation  = plotType.get_label_notation_prefix() # label notation's prefix
+    def __init__(self, outDir, plotType, curves, colorCycle):
+        self.curves        = curves                               # curves to plot
+        self.colorCycle    = colorCycle                           # color cycle for curves
+        self.labelNotation = plotType.get_label_notation_prefix() # label notation's prefix
 
         self.statsAverages      = { } # per curve: average per-packet delay stats
         self.statsMedians       = { } # per curve: median per-packet delay stats
@@ -42,9 +42,11 @@ class PerPacketDelay(object):
 
     #
     # Method plots per-packet delay of the curves
+    # throws DataError
     #
     def plot(self):
         figure, ax = plt.subplots(figsize=(16, 9))
+        ax.set_prop_cycle(self.colorCycle)
 
         for curve in self.curves:
             xData, yData = self.get_data(curve)
@@ -123,9 +125,10 @@ class PerPacketDelay(object):
     # Method computes x-axis and y-axis data to plot per-packet delay of the curve
     # param [in] curve - the curve to plot
     # returns x-data and y-data of the curve
+    # throws DataError
     #
     def get_data(self, curve):
-        arrivals, delays = curve.get_delays(self.inDir)
+        arrivals, delays = curve.get_delays()
 
         self.statsAverages     [curve] = None
         self.statsMedians      [curve] = None

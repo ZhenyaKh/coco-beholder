@@ -24,15 +24,15 @@ class JainIndex(object):
     # Constructor
     # param [in] outDir      - full path of output directory for graphs and stats
     # param [in] plotType    - type of graphs and stats to make
-    # param [in] curves      - list of curves to plot
-    # param [in] slotSec     - float slot size in seconds
-    # param [in] averageRate - average rate data of the curves
+    # param [in] averageRate - average rate data to compute Jain's Index over
+    # param [in] color       - color of Jain's Index curve
     #
-    def __init__(self, outDir, plotType, curves, slotSec, averageRate):
-        self.curves      = curves                      # curves to plot
-        self.slotSec     = float(slotSec)              # float slot size in seconds
-        self.slotsNumber = len(curves[0].slottedPkts)  # number of slots
-        self.averageRate = averageRate                 # average rate data of the curves
+    def __init__(self, outDir, plotType, averageRate, color):
+        self.averageRate = averageRate                 # average rate data to compute Jain's Index
+        self.curves      = averageRate.get_curves()    # curves for which Jain's Index is computed
+        self.slotSec     = self.curves[0].SLOT_SEC     # float slot size in seconds
+        self.slotsNumber = self.curves[0].SLOTS_NUMBER # number of slots
+        self.color       = color                       # color of the Jain's Index curve
         self.jainStats   = None                        # average Jain's index stats
 
         filename = '{}-{}.{}'.format(plotType.get_filename_prefix(), AVERAGE_JAIN, PLOTS_EXTENSION)
@@ -50,7 +50,7 @@ class JainIndex(object):
 
         xData, yData = self.get_data()
 
-        ax.plot(xData, yData, marker=get_marker(xData), label=self.get_label())
+        ax.plot(xData, yData, marker=get_marker(xData), label=self.get_label(), color=self.color)
 
         ax.ticklabel_format(useOffset=False, style='plain') # turn off scientific notation
         locator = plticker.MultipleLocator(base=1)          # enforce tick for each second on x axis
