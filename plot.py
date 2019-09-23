@@ -123,7 +123,7 @@ def add_arguments(parser):
     parser.add_argument('-i', '--interval', default=0.5, type=float, metavar='SEC',
     help='Interval per which average graphs are computed in seconds, default is 0.5')
 
-    parser.add_argument('-c', '--colors', metavar='COLOR1 COLOR2...',
+    parser.add_argument('-c', '--colors', metavar='"COLOR1 COLOR2..."',
     help='Color cycle for curves with colors specified in any format recognized by matplotlib')
 
     parser.add_argument('-j', '--jains-index-color', metavar='COLOR',
