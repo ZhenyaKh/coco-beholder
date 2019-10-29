@@ -123,7 +123,7 @@ def parse_time_str(timeString, maxDelayUs):
         raise ValueError('Invalid time "%s". Time should be non-negative.' % timeString)
 
     if time > maxDelayUs:
-        raise ValueError('Invalid time "%s". Time should be less than %d us.' %
+        raise ValueError('Invalid time "%s". Time should not be greater than %d us.' %
                         (timeString, maxDelayUs))
 
     return time
