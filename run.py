@@ -180,7 +180,7 @@ def add_arguments(parser):
     help='Runtime of testing in seconds (default 30)')
 
     parser.add_argument('-m', '--max-delay', default=int(1e8), type=int, metavar='USEC',
-    help='Maximum delay for any interface in microseconds (default is 100000000, that is 100 sec)')
+    help='Max delay and jitter fed to netem in microseconds (default is 100000000, i.e. 100 sec)')
 
     parser.add_argument('-s', '--seed', default=time.time(), type=float,
     help='Randomization seed to define if the delay at the central link is increased or decreased '
@@ -228,7 +228,7 @@ def process_arguments(args):
     output[LAYOUT_PATH ] = process_layout_argument(args.layout,       output[RUNTIME], output[RATE])
 
     output[BASE  ] = process_time_arg(BASE,   args.base,   output[MAX_DELAY])
-    output[DELTA ] = process_time_arg(DELTA,  args.delta,  output[MAX_DELAY])
+    output[DELTA ] = process_time_arg(DELTA,  args.delta,  float('inf'))
     output[STEP  ] = process_time_arg(STEP,   args.step,   output[MAX_DELAY])
     output[JITTER] = process_time_arg(JITTER, args.jitter, output[MAX_DELAY]) if args.jitter else 0
 
