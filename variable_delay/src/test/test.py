@@ -415,7 +415,7 @@ class Test(object):
 
             senderDumpPopen   = senderHost.  popen(shlex.split(cmd.format(
                 senderIntf,   self.user, self.bufferKiB, senderDumpPath,   receiverIp, senderIp)))
-            
+
             self.receiverDumpPopens.append(receiverDumpPopen)
             self.senderDumpPopens.  append(senderDumpPopen)
 
@@ -466,7 +466,10 @@ class Test(object):
     def start_pool(self):
         originalSigintHandler = signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-        pool = Pool(min(cpu_count() - 1, len(max(self.startsSchedule, key=lambda x: len(x)))))
+        maxFlowsStarted  = len(max(self.startsSchedule, key=lambda x: len(x)))
+        cpuCountMinusOne = max(1, cpu_count() - 1)
+
+        pool = Pool(min(cpuCountMinusOne, maxFlowsStarted))
 
         signal.signal(signal.SIGINT, originalSigintHandler)
 
