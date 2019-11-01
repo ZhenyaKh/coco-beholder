@@ -11,19 +11,19 @@ installation of the exact versions of the dependencies, if needed.
 The installation process is as following:
 
 * Install Pantheon collection of congestion control schemes and, if needed, 
-[add](## Adding a new scheme) more schemes to the collection
+[add](#adding-a-new-scheme) more schemes to the collection
 
 * Install CoCo-Beholder using its installation script
 
-* Done. [Test](##testing) the schemes in the collection using CoCo-Beholder.
+* Done. [Test](#testing) the schemes in the collection using CoCo-Beholder.
 
 CoCo-Beholder installation scipt `install.sh` is super easy and short. However, 
 due to the facts that there are bugs in the operating systems and that some 
 schemes fail to get installed properly, the above described installation 
 process is not trivial. Please, cosider the detailed instructions for 
-[Ubuntu 16.04](###Installation on Ubuntu 16.04 LTS), 
-[Ubuntu 18.04](###Installation on Ubuntu 18.04 LTS), and
-[Debian 10](###Installation on Debian 10).
+[Ubuntu 16.04](#installation-on-ubuntu-1604-lts), 
+[Ubuntu 18.04](#installation-on-ubuntu-1804-lts), and
+[Debian 10](#installation-on-debian-10).
 
 ### Installation on Ubuntu 16.04 LTS
 
@@ -36,7 +36,7 @@ kernels >=4.9.
 * Fresh releases of 16.04 LTS (16.04.5 and higher) provide Linux kernel 
 4.15 with HWE. The information on Ubuntu kernels and HWE can be found 
 [here](https://wiki.ubuntu.com/Kernel/LTSEnablementStack). 
-CoCo-Beholder [uses](##Testing) **tc qdisc netem jitter**, and the feature is 
+CoCo-Beholder [uses](#testing) **tc qdisc netem jitter**, and the feature is 
 [broken](https://bugs.launchpad.net/bugs/1783822) on Ubuntu kernel 4.15. The 
 solution:
 
@@ -85,39 +85,11 @@ output of the server). To clean up all the Webrtc processes, run
 cd coco-beholder && sudo ./install.sh
 ```
 
-Now you are ready to [test](##Testing) the schemes.
+Now you are ready to [test](#testing) the schemes.
 
 ## Testing
 
 ## Adding a new scheme
-
-
-
-
-## Installation
-
-### Ubuntu 16.04 LTS and 18.04 LTS
-
-*TCP BBRv1.0 scheme requires kernel 4.9 or higher. Tc qdisc netem delay jitter 
-is broken on kernel 4.15.*
-
-#### Ubuntu 16.04 LTS
-
-The fresh versions of 16.04 LTS (16.04.6 on Nov. 2019) provide Linux kernel 
-4.15 with HWE. The information on Ubuntu kernels and HWE can be found 
-[here](https://wiki.ubuntu.com/Kernel/LTSEnablementStack).
-
-
-
-* CoCo-Beholder installation script installs Pantheon and some Python modules. 
-You might want to inspect the contents of the script beforehand to change, skip 
-or make manually any of its actions. As an argument, the scripts expects to get 
-the path of the directory, to which Pantheon should be downloaded. E.g., with 
-the commands below, Pantheon will be downloaded into your home directory:
-```
-$ cd coco-beholder
-$ sudo ./install.sh ~
-```
 
 ## Dependencies to install
   
