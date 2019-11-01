@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+sudo apt-get -y install net-tools ethtool iproute2 tcpdump lsof procps
+
 #
 # For Python 2:
 #

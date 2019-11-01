@@ -42,46 +42,53 @@ solution:
 
   * Please, install 4.13 kernel to have the jitter:
 
-   ```
+   ```bash
    sudo apt-get install linux-image-4.13.0-39-generic linux-headers-4.13.0-39 \
    linux-headers-4.13.0-39-generic linux-image-extra-4.13.0-39-generic
    ```
   * In file `/etc/default/grub`, comment out the line `GRUB_HIDDEN_TIMEOUT=0` 
-  and run the command `$ sudo update-grub`. This will allow you to see Grub menu 
+  and run the command `sudo update-grub`. This will allow you to see Grub menu 
   after the reboot.
 
   * Reboot and in Grub menu, choose `Advanced options for Ubuntu` and 
-  there `Ubuntu, with Linux 4.13.0-39-generic`. Check the running kernel: 
-  `$ uname -ar`.
+  there `Ubuntu, with Linux 4.13.0-39-generic`. Check the running kernel with 
+  the command `uname -ar`.
 
 * Download Pantheon git repository and git submodules of the included schemes:
 
-```
+```bash
 git clone https://github.com/StanfordSNR/pantheon.git && cd pantheon
 git submodule update --init --recursive
 ```
 
-* You can skip the installation of Pantheon itself (with  its 
-`tools/install_deps.sh` script). You need to install only the schemes.
-As explained [here](https://github.com/StanfordSNR/pantheon#dependencies),
-use the commands below. If the `--setup` command gives you an error like 
-`Command "python setup.py egg_info" failed with error code 1...`, then run 
-the command `sudo pip install --upgrade pip` and repeat the `--setup` command.
+* Prevent Pantheon from applying the patches 
+[reducing MTU](https://pantheon.stanford.edu/faq/#tunnel) of some schemes:
 
+```bash
+rm -r src/wrappers/patches
 ```
+
+* The installation of Pantheon and of the included schemes is described 
+[here](https://github.com/StanfordSNR/pantheon#dependencies).
+You can skip the installation of Pantheon itself (with  its 
+`tools/install_deps.sh` script). You need to install only the schemes using the 
+commands below. If the last command gives you an error like 
+`Command "python setup.py egg_info" failed with error code 1...`, then execute 
+`sudo pip install --upgrade pip` and repeat the failed command.
+
+```bash
+sudo apt-get install autoconf                              # for verus
+sudo apt-get install nodejs-legacy                         # for webrtc
+sudo apt-get install python-pip && sudo pip install pyyaml # for setup.py
+
 src/experiments/setup.py --install-deps (--all | --schemes "<cc1> <cc2> ...")
-src/experiments/setup.py --setup [--all | --schemes "<cc1> <cc2> ..."]
+src/experiments/setup.py --setup (--all | --schemes "<cc1> <cc2> ...")
 ``` 
 
-* Run WebRTC server with the command `src/wrappers/webrtc.py sender 54321`. 
-The error `Popen(['node'... OSError: [Errno 2] No such file or directory` is
-repaired with `sudo apt-get install nodejs-legacy`.  Try again (never mind the 
-output of the server). To clean up all the Webrtc processes, run 
-`sudo pkill -9 -f webrtc` afterwards.
+* Leave Pantheon git repository, download CoCo-Beholder git repository, and run 
+CoCo-Beholder installation script:
 
-* Download CoCo-Beholder git repository and run its installation script:
-
-```
+```bash
 cd coco-beholder && sudo ./install.sh
 ```
 
@@ -117,3 +124,4 @@ servers of schemes, launching tcpdump recording, changing tc qdisc netem
 settings for host interfaces, and etc. is done using Mininet popen API. Mininet 
 controllers and switches are _not_ used and so the network is _not_ started up 
 in terms of Mininet, as there is no need for it.
+
