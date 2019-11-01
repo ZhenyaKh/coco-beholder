@@ -20,7 +20,7 @@ The installation process is as following:
 CoCo-Beholder installation scipt `install.sh` is super easy and short. However, 
 due to the facts that there are bugs in the operating systems and that some 
 schemes fail to get installed properly, the above described installation 
-process is not trivial. Please, cosider the detailed instructions for 
+process is not always simple. Please, cosider the detailed instructions for 
 [Ubuntu 16.04](#installation-on-ubuntu-1604-lts), 
 [Ubuntu 18.04](#installation-on-ubuntu-1804-lts), and
 [Debian 10](#installation-on-debian-10).
@@ -79,6 +79,51 @@ commands below. If the last command gives you an error like
 ```bash
 sudo apt-get install autoconf                              # for verus
 sudo apt-get install nodejs-legacy                         # for webrtc
+sudo apt-get install python-pip && sudo pip install pyyaml # for setup.py
+
+src/experiments/setup.py --install-deps (--all | --schemes "<cc1> <cc2> ...")
+src/experiments/setup.py --setup (--all | --schemes "<cc1> <cc2> ...")
+``` 
+
+* Leave Pantheon git repository, download CoCo-Beholder git repository, and run 
+CoCo-Beholder installation script:
+
+```bash
+cd coco-beholder && sudo ./install.sh
+```
+
+Now you are ready to [test](#testing) the schemes.
+
+### Installation on Ubuntu 18.04 LTS
+
+The instructions below were tested on the VM with a fresh install of Ubuntu 
+18.04.3-desktop-amd64 (Nov. 2019).
+
+* Fresh releases of 18.04 LTS (18.04.3 and higher) provide Linux kernel 
+5.0 with HWE. This is okay and we switch to the next step at once.
+
+* Download Pantheon git repository and git submodules of the included schemes:
+
+```bash
+git clone https://github.com/StanfordSNR/pantheon.git && cd pantheon
+git submodule update --init --recursive
+```
+
+* Prevent Pantheon from applying the patches 
+[reducing MTU](https://pantheon.stanford.edu/faq/#tunnel) of some schemes:
+
+```bash
+rm -r src/wrappers/patches
+```
+
+* The installation of Pantheon and of the included schemes is described 
+[here](https://github.com/StanfordSNR/pantheon#dependencies).
+You can skip the installation of Pantheon itself (with  its 
+`tools/install_deps.sh` script). You need to install only the schemes using the 
+commands below.
+
+```bash
+sudo apt-get install autoconf                              # for verus
 sudo apt-get install python-pip && sudo pip install pyyaml # for setup.py
 
 src/experiments/setup.py --install-deps (--all | --schemes "<cc1> <cc2> ...")
