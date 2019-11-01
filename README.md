@@ -15,7 +15,7 @@ The installation process is as following:
 
 * Install CoCo-Beholder using its installation script
 
-* Done. [Test](##Testing) the schemes in the collection using CoCo-Beholder.
+* Done. [Test](##testing) the schemes in the collection using CoCo-Beholder.
 
 CoCo-Beholder installation scipt `install.sh` is super easy and short. However, 
 due to the facts that there are bugs in the operating systems and that some 
