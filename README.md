@@ -1,6 +1,6 @@
 # CoCo-Beholder: Testing Congestion Control Schemes
 
-CoCo-Beholde was ensured to work with Python 2.7, 3.5, 3.6, and 3.7. 
+CoCo-Beholder is ensured to work with Python 2.7, 3.5, 3.6, and 3.7. 
 CoCo-Beholder installation script `install.sh` installs Python 2 library 
 dependencies by default. For Python 3, please, comment out the corresponding 
 lines in the installation script.
@@ -12,14 +12,14 @@ The installation process is as following:
 * Install Pantheon collection of congestion control schemes and, if needed, 
 [add](#adding-a-new-scheme) more schemes to the collection
 
-* Install CoCo-Beholder using its installation script
+* Install CoCo-Beholder emulator using its installation script
 
 * Done. [Test](#testing) the schemes in the collection using CoCo-Beholder.
 
-CoCo-Beholder installation scipt `install.sh` is super easy and short. However, 
-due to the facts that there are bugs in the operating systems and that some 
-schemes fail to get installed properly, the above described installation 
-process is not always simple. Please, cosider the detailed instructions for 
+Installing CoCo-Beholder itself is always trivial because its installation 
+scipt `install.sh` is super easy and short. However, installing the collection 
+of the schemes often causes lots of problems. Also, there are troublesome 
+bugs in some operating systems. Thus, please, see the detailed instructions for 
 [Ubuntu 16.04](#installation-on-ubuntu-1604-lts), 
 [Ubuntu 18.04](#installation-on-ubuntu-1804-lts), and
 [Debian 10](#installation-on-debian-10).
@@ -29,12 +29,10 @@ process is not always simple. Please, cosider the detailed instructions for
 The instructions below were tested on the VM with a fresh install of Ubuntu 
 16.04.6-desktop-amd64 (Nov. 2019).
 
-* As a general note: if you need TCP BBRv1.0 scheme make sure to use Linux 
-kernels >=4.9.
+* As a general note: if you need bbr (TCP BBRv1.0) scheme make sure to use 
+Linux kernel >=4.9.
 
-* Fresh releases of 16.04 LTS (16.04.5 and higher) provide Linux kernel 
-4.15 with HWE. The information on Ubuntu kernels and HWE can be found 
-[here](https://wiki.ubuntu.com/Kernel/LTSEnablementStack). 
+* Fresh releases of 16.04 LTS (16.04.5 and higher) come with Linux kernel 4.15. 
 CoCo-Beholder [uses](#testing) **tc qdisc netem jitter**, and the feature is 
 [broken](https://bugs.launchpad.net/bugs/1783822) on Ubuntu kernel 4.15. The 
 solution:
@@ -98,8 +96,12 @@ Now you are ready to [test](#testing) the schemes.
 The instructions below were tested on the VM with a fresh install of Ubuntu 
 18.04.3-desktop-amd64 (Nov. 2019).
 
-* Fresh releases of 18.04 LTS (18.04.3 and higher) provide Linux kernel 
-5.0 with HWE. This is okay and we switch to the next step at once.
+* As a general note: if you need bbr (TCP BBRv1.0) scheme make sure to use 
+Linux kernel >=4.9.
+
+* As explained [here](#installation-on-ubuntu-1604-lts), Ubuntu kernel 4.15 
+does **not** suit. With Ubuntu >=18.04.3, you get kernel >=5.0 so, please, 
+proceed to the next step.
 
 * Download Pantheon git repository and git submodules of the included schemes:
 
@@ -140,11 +142,16 @@ Now you are ready to [test](#testing) the schemes.
 
 ### Installation on Debian 10
 
-The instructions below were tested on the VM with a fresh install of Ubuntu 
-18.04.3-desktop-amd64 (Nov. 2019). Do not miss anything.
+The instructions below were tested on the VM with a fresh install of Debian 
+10.1.0-amd64-netinst (Nov. 2019).
 
-* Fresh releases of 18.04 LTS (18.04.3 and higher) provide Linux kernel 
-5.0 with HWE. This is okay and we switch to the next step at once.
+* As a general note: if you need bbr (TCP BBRv1.0) scheme make sure to use 
+Linux kernel >=4.9.
+
+* Note that Ubuntu kernel 4.15 has a significant bug, as explained 
+[here](#installation-on-ubuntu-1604-lts). It is not clear if Debian kernel 4.15 
+has this issue. Anyway, with Debian >=10.1.0, you get kernel >=4.19 so, please, 
+proceed to the next step.
 
 * Download Pantheon git repository and git submodules of the included schemes:
 
