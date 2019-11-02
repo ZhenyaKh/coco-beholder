@@ -252,7 +252,7 @@ Not only will the scheme be added to the collection but also Pantheon will
 perform periodical **live testing** of the scheme and the results will be 
 publicly archived on Pantheon [site](https://pantheon.stanford.edu/summary/).
 
-You can also add a scheme locally. The process is still quite similar:
+You can also add a scheme locally, e.g., to test it with CoCo-Beholder:
 
 * E.g. for TCP CDG, first, check if the module is present in your kernel:
 
