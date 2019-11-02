@@ -227,22 +227,22 @@ Now you are ready to [test](#testing) the schemes.
 enables to see the output of the scheme:
 
 ```bash
-$ cd pantheon
-$ src/wrappers/vegas.py setup_after_reboot # setup the scheme once after reboot
-$ src/wrappers/vegas.py run_first          # who is server: sender or receiver
-receiver
-$ src/wrappers/vegas.py receiver 54321         # start server in one shell
-$ src/wrappers/vegas.py sender 127.0.0.1 54321 # start client in another shell
-$ sudo pkill -9 -f vegas                       # kill all the started processes
+cd pantheon
+src/wrappers/vegas.py setup_after_reboot # setup the scheme once after reboot
+src/wrappers/vegas.py run_first          # who is server: sender or receiver
+# receiver
+src/wrappers/vegas.py receiver 54321         # start server in one shell
+src/wrappers/vegas.py sender 127.0.0.1 54321 # start client in another shell
+sudo pkill -9 -f vegas                       # kill all the started processes
 ```
 
 * The second way is to make CoCo-Beholder show output of schemes. Change its 
 source code, as shown below, and run schemes [as usual](#testing).
 
 ```bash
-$ cd coco-beholder
-$ myregex='s/(\(.\+\)).pid/(\1, stdout=None, stderr=None).pid/g'
-$ sed -i "$myregex" variable_delay/src/test/test.py
+cd coco-beholder
+myregex='s/(\(.\+\)).pid/(\1, stdout=None, stderr=None).pid/g'
+sed -i "$myregex" variable_delay/src/test/test.py
 ```
 ## Adding a new scheme
 
@@ -257,9 +257,30 @@ You can also add a scheme locally. The process is still quite similar:
 * E.g. for TCP CDG, first, check if the module is present in your kernel:
 
 ```bash
-$ find /lib/modules/`(uname -r)`/kernel -type f -name *cdg*
-/lib/modules/4.13.0-39-generic/kernel/net/ipv4/tcp_cdg.ko
+find /lib/modules/`(uname -r)`/kernel -type f -name *cdg*
+# /lib/modules/4.19.0-6-amd64/kernel/net/ipv4/tcp_cdg.ko
 ```
+
+* Add a new `cdg` entry to `pantheon/src/config.yml` file that keeps the list 
+of all the schemes in the collection. The color, name, and marker can be any 
+bacause CoCo-Beholder does not read them.
+
+```yaml
+  cdg:
+    name: TCP CDG
+    color: red
+    marker: 'x'
+```
+
+* Create the wrapper for cdg scheme as a modified copy of, e.g., vegas wrapper:
+
+```[bash]
+cp pantheon/src/wrappers/vegas.py pantheon/src/wrappers/cdg.py
+sed -i 's/vegas/cdg/g' pantheon/src/wrappers/cdg.py
+```
+
+Now you can [test](#testing) cdg with CoCo-Beholder as usual by specifying cdg 
+flows in the layout file.
 
 ## Testing
 
