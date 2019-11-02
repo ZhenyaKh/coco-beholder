@@ -221,6 +221,30 @@ sudo pip install arrow==0.12.0
 
 Now you are ready to [test](#testing) the schemes.
 
+## Troubleshooting a scheme
+
+* The first way is to launch a scheme on localhost without an emulator. This
+enables to see the output of the scheme:
+
+```bash
+$ cd pantheon
+$ src/wrappers/vegas.py setup_after_reboot # setup the scheme once after reboot
+$ src/wrappers/vegas.py run_first          # who is server: sender or receiver
+receiver
+$ src/wrappers/vegas.py receiver 54321         # start server in one shell
+$ src/wrappers/vegas.py sender 127.0.0.1 54321 # start client in another shell
+$ sudo pkill -9 -f vegas                       # kill all the started processes
+```
+
+* The second way is to make CoCo-Beholder show output of schemes. Change the 
+source code temporarily, as shown below, and run schemes as usual with `run.py`.
+
+```bash
+$ cd coco-beholder
+$ myregex='s/(\(.\+\)).pid/(\1, stdout=None, stderr=None).pid/g'
+$ sed -i "$myregex" variable_delay/src/test/test.py
+```
+
 ## Testing
 
 ## Adding a new scheme
