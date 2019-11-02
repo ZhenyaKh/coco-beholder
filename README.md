@@ -236,18 +236,32 @@ $ src/wrappers/vegas.py sender 127.0.0.1 54321 # start client in another shell
 $ sudo pkill -9 -f vegas                       # kill all the started processes
 ```
 
-* The second way is to make CoCo-Beholder show output of schemes. Change the 
-source code temporarily, as shown below, and run schemes as usual with `run.py`.
+* The second way is to make CoCo-Beholder show output of schemes. Change its 
+source code, as shown below, and run schemes [as usual](#testing).
 
 ```bash
 $ cd coco-beholder
 $ myregex='s/(\(.\+\)).pid/(\1, stdout=None, stderr=None).pid/g'
 $ sed -i "$myregex" variable_delay/src/test/test.py
 ```
+## Adding a new scheme
+
+You can add a scheme to Pantheon globally, as explained on Pantheon Github 
+[page](https://github.com/StanfordSNR/pantheon#how-to-add-your-own-congestion-control).
+Not only will the scheme be added to the collection but also Pantheon will 
+perform periodical **live testing** of the scheme and the results will be 
+publicly archived on Pantheon [site](https://pantheon.stanford.edu/summary/).
+
+You can also add a scheme locally. The process is still quite similar:
+
+* E.g. for TCP CDG, first, check if the module is present in your kernel:
+
+```bash
+$ find /lib/modules/`(uname -r)`/kernel -type f -name *cdg*
+/lib/modules/4.13.0-39-generic/kernel/net/ipv4/tcp_cdg.ko
+```
 
 ## Testing
-
-## Adding a new scheme
 
 ## Dependencies to install
   
