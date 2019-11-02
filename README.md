@@ -254,7 +254,7 @@ publicly archived on Pantheon [site](https://pantheon.stanford.edu/summary/).
 
 You can also add a scheme locally, e.g., to test it with CoCo-Beholder:
 
-* E.g. for TCP CDG, first, check if the module is present in your kernel:
+* Suppose you want to add TCP CDG. Check if the module is present in your kernel:
 
 ```bash
 find /lib/modules/`(uname -r)`/kernel -type f -name *cdg*
