@@ -1,10 +1,9 @@
 # CoCo-Beholder: Testing Congestion Control Schemes
 
-All the CoCo-Beholder tools were tested to work properly with Python 2.7, 3.5, 
-3.6, and 3.7. CoCo-Beholder installation script `install.sh` installs Python 2
-library dependencies by default. In this script, there are also commented out
-lines enabling the installation of the dependencies for Python 3 and the 
-installation of the exact versions of the dependencies, if needed.
+CoCo-Beholde was ensured to work with Python 2.7, 3.5, 3.6, and 3.7. 
+CoCo-Beholder installation script `install.sh` installs Python 2 library 
+dependencies by default. For Python 3, please, comment out the corresponding 
+lines in the installation script.
 
 ## Installation
 
