@@ -246,13 +246,8 @@ sed -i "$myregex" variable_delay/src/test/test.py
 ```
 ## Adding a new scheme
 
-You can add a scheme to Pantheon globally, as explained on Pantheon Github 
-[page](https://github.com/StanfordSNR/pantheon#how-to-add-your-own-congestion-control).
-Not only will the scheme be added to the collection but also Pantheon will 
-perform periodical **live testing** of the scheme and the results will be 
-publicly archived on Pantheon [site](https://pantheon.stanford.edu/summary/).
-
-You can also add a scheme locally, e.g., to test it with CoCo-Beholder:
+If you want to test a scheme that is not present in Pantheon collection you can 
+add it locally as following:
 
 * Suppose you want to add TCP CDG. Check if the module is present in your kernel:
 
