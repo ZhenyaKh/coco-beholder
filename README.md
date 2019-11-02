@@ -204,7 +204,7 @@ sed -i $myregex third_party/verus/src/verus_server.cpp
 sudo apt-get install pkg-config                           # for sprout
 
 sudo apt-get install libtinfo5                            # for quic
-# Do not be afraid of the Quic errors CERTIFICATE_VERIFY_FAILED
+# During the setup, do not be afraid of CERTIFICATE_VERIFY_FAILED errors by quic
 
 src/experiments/setup.py --setup (--all | --schemes "<cc1> <cc2> ...")
 ``` 
