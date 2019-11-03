@@ -1,9 +1,11 @@
-# CoCo-Beholder: Testing Congestion Control Schemes
+# CoCo-Beholder: Testing Congestion Control 
 
 CoCo-Beholder is ensured to work with Python 2.7, 3.5, 3.6, and 3.7. 
 CoCo-Beholder installation script `install.sh` installs Python 2 library 
 dependencies by default. For Python 3, please, comment out the corresponding 
 lines in the installation script.
+
+## Testing
 
 ## Installation
 
@@ -277,32 +279,13 @@ sed -i 's/vegas/cdg/g' pantheon/src/wrappers/cdg.py
 Now you can [test](#testing) cdg with CoCo-Beholder as usual by specifying cdg 
 flows in the layout file.
 
-## Testing
+## Third-party libraries
 
-## Dependencies to install
-  
-- ### [**Pantheon**](https://github.com/StanfordSNR/pantheon)
-
-  **IMPORTANT!**
-Before testing the third-party schemes present in Pantheon using the 
-Variable-Delay tool, it is crucial not only to install dependencies of the 
-schemes using `src/experiments/setup.py --install-deps` command but also to set 
-up the schemes using `src/experiments/setup.py --setup` command. Without the 
-setup, some schemes can work in a wrong way. For example, the scheme *quic* 
-installs necessary certificates into the OS during the setup – without the 
-certificates, *quic* traffic will not start to flow between client and server 
-due to invalid certificate error. It is enough to run the two commands once on 
-a user's machine.
-   
-  At the same time, there is no need to run `src/experiments/setup.py` 
-command (without `--setup`) on every reboot because the Variable-Delay tool 
-runs the command for all the schemes to be tested as it is. 
-    
-- ### [**Mininet**](https://github.com/mininet/mininet)
-
-  The point-to-point topology is built with Mininet. Launching clients and 
-servers of schemes, launching tcpdump recording, changing tc qdisc netem 
-settings for host interfaces, and etc. is done using Mininet popen API. Mininet 
-controllers and switches are _not_ used and so the network is _not_ started up 
-in terms of Mininet, as there is no need for it.
-
+CoCo-Beholder utilizes [Mininet](https://github.com/mininet/mininet) library: 
+the API that allows to create a virtual host as a UNIX shell in a separate 
+network namespace, to create a veth pair link between a pair of virtual hosts, 
+and  to launch processes at a virtual host. CoCo-Beholder does not use 
+Controller, Switch, Topology, TCLink or other higher-level entities of Mininet.
+To prevent any future compatability issues and to make the installation of 
+CoCo-Beholder easier, the needed parts of Mininet 2.3.0d5 are included into
+CoCo-Beholder repository as a third-party library according to Mininet license.
