@@ -2,7 +2,7 @@
 
 [1]: #coco-beholder-highly-customizable-testing-of-congestion-control-algorithms
 [2]: https://github.com/StanfordSNR/pantheon#dependencies "Pantheon dependencies"
-[3]: https://bugs.launchpad.net/bugs/1783822 "The Ubuntu bug"
+[3]: https://bugs.launchpad.net/bugs/1783822 "Tc qdisc NetEm Delay Jitter Bug"
 [4]: https://pantheon.stanford.edu/faq/#tunnel "Pantheon FAQ: Tunnel"
 [5]: https://github.com/mininet/mininet "Mininet on Github"
 
@@ -174,6 +174,8 @@ bugs in some operating systems. Thus, please, see the detailed instructions for
 
 ### Installation on Ubuntu 16.04 LTS
 
+<details> <summary>Please, click to expand.</summary>
+
 The instructions below were tested on the VM with a fresh install of Ubuntu 
 16.04.6-desktop-amd64 (Nov. 2019).
 
@@ -236,7 +238,11 @@ cd coco-beholder && sudo ./install.sh
 
 Now you are ready to [test](#testing) the schemes.
 
+</details>
+
 ### Installation on Ubuntu 18.04 LTS
+
+<details> <summary>Please, click to expand.</summary>
 
 The instructions below were tested on the VM with a fresh install of Ubuntu 
 18.04.3-desktop-amd64 (Nov. 2019).
@@ -244,9 +250,8 @@ The instructions below were tested on the VM with a fresh install of Ubuntu
 * As a general note: if you need bbr (TCP BBRv1.0) scheme make sure to use 
 Linux kernel >=4.9.
 
-* As explained [here](#installation-on-ubuntu-1604-lts), Ubuntu kernel 4.15 
-does **not** suit. With Ubuntu >=18.04.3, you get kernel >=5.0 so, please, 
-proceed to the next step.
+* Ubuntu kernel 4.15 has the [bug][3]. With Ubuntu >=18.04.3, you get 
+kernel >=5.0 so, please, proceed to the next step.
 
 * Download Pantheon git repository and git submodules of the included schemes:
 
@@ -283,7 +288,11 @@ cd coco-beholder && sudo ./install.sh
 
 Now you are ready to [test](#testing) the schemes.
 
+</details>
+
 ### Installation on Debian 10
+
+<details> <summary>Please, click to expand.</summary>
 
 The instructions below were tested on the VM with a fresh install of Debian 
 10.1.0-amd64-netinst (Nov. 2019).
@@ -291,8 +300,7 @@ The instructions below were tested on the VM with a fresh install of Debian
 * As a general note: if you need bbr (TCP BBRv1.0) scheme make sure to use 
 Linux kernel >=4.9.
 
-* Note that Ubuntu kernel 4.15 has a significant bug, as explained 
-[here](#installation-on-ubuntu-1604-lts). It is not clear if Debian kernel 4.15 
+* Ubuntu kernel 4.15 has the [bug][3]. It is not clear if Debian kernel 4.15 
 has this issue. Anyway, with Debian >=10.1.0, you get kernel >=4.19 so, please, 
 proceed to the next step.
 
@@ -361,6 +369,8 @@ sudo pip install arrow==0.12.0
 ```
 
 Now you are ready to [test](#testing) the schemes.
+
+</details>
 
 ## Troubleshooting a scheme
 
