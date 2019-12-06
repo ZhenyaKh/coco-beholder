@@ -1,4 +1,11 @@
 # CoCo-Beholder: Highly-Customizable Testing of Congestion Control Algorithms
+
+[1]: #coco-beholder-highly-customizable-testing-of-congestion-control-algorithms
+[2]: https://github.com/StanfordSNR/pantheon#dependencies "Pantheon dependencies"
+[3]: https://bugs.launchpad.net/bugs/1783822 "The Ubuntu bug"
+[4]: https://pantheon.stanford.edu/faq/#tunnel "Pantheon FAQ: Tunnel"
+[5]: https://github.com/mininet/mininet "Mininet on Github"
+
 ```
 
                            ----    0-TH SEC:    ----
@@ -42,10 +49,9 @@ delta 500 ms, step 10 ms, jitter 5 ms.
 
 If this is the first run of the script, the default layout file `layout.yml` is
 generated, as shown below. The resulting testing setup is present in the 
-[drawing](#coco-beholder-highly-customizable-testing-of-congestion-control-algorithms) 
-of the dumbbell topology at the top of this page. The layout file can be edited 
-to get much more complex testing setups with more flows belonging to various 
-schemes and having diverse network settings.
+[drawing][1] of the dumbbell topology at the top of this page. The layout file 
+can be edited to get much more complex testing setups with more flows belonging 
+to various schemes and having diverse network settings.
 
 ```yaml
 # Delays/rates are optional: if lacking or null, they are set to 0us/0.0
@@ -96,12 +102,56 @@ Into a chosen output directory, `metadata.json` file is written containing
 be fed to CoCo-Beholder in the future to fully reproduce the test. Also, during 
 the testing, PCAP dump files are recorded at all the hosts of the dumbbell 
 topology into the output directory using `tcpdump`. So for the example in the
-[drawing](#coco-beholder-highly-customizable-testing-of-congestion-control-algorithms),
-eight PCAP dump files were recorded.
+[drawing][1], eight PCAP dump files were recorded.
 
 Note: the maximum delay at both the side links and the central link (jitter not 
 counted) can be specified with `-m` option. To have a square-wave delay at the 
 central link, set the maximum delay to the sum of the base delay and step.
+
+## Analysis
+
+Analysis script only accepts two arguments: the input folder and output folder 
+-- `dumps` and `graphs/data` by default. 
+
+First, the script simply copies the metadata file from the input folder into 
+the output folder. Then, the script processes a pair of PCAP dumps 
+`<flow's starting #>-<scheme>-<sender/receiver>.pcap` of each flow and extracts 
+information on the flow's packets into the flow's individual json data log file. 
+For two 12 GB PCAP dumps, one ~300 MB data log file is produced. 
+
+The partial output of the analysis script for the example in the [drawing][1]:
+
+```bash
+./analyze.py
+
+cubic scheme, flow 1:
+
+sender   dump: 100.0% in 5.18s
+
+Total: 222667 pkts/224631734 bytes, from sender: 144906 pkts/219351284 bytes
+
+receiver dump: 100.0% in 5.37s
+
+Total: 222245 pkts/223376026 bytes, from sender: 144052 pkts/218058328 bytes
+
+♥ Union of data from sender recorded on both sides: 144906 pkts/219351284 bytes
+♦ Subset of ♥ which was not recorded at sender    : 0 pkts/0 bytes
+♣ Subset of ♥ which was not recorded at receiver  : 854 pkts/1292956 bytes
+♠ Loss (ratio of ♣ bytes to ♥ bytes)              : 0.589%
+
+Saving the data of the flow to the file...
+
+==========================================
+
+# and so on for the three more flows...
+```
+
+For forthcoming plots and statistics generation, the PCAP dumps are not needed 
+anymore. The analysis of the PCAP dumps is performed only once, and then the 
+plotting tool may be run as many times as needed over the data log files to 
+produce various plots quickly.
+
+## Plots and statistics generation
 
 ## Installation
 
@@ -131,9 +181,8 @@ The instructions below were tested on the VM with a fresh install of Ubuntu
 Linux kernel >=4.9.
 
 * Fresh releases of 16.04 LTS (16.04.5 and higher) come with Linux kernel 4.15. 
-CoCo-Beholder uses **tc qdisc netem jitter**, and the feature is 
-[broken](https://bugs.launchpad.net/bugs/1783822) on Ubuntu kernel 4.15. The 
-solution:
+CoCo-Beholder uses **tc qdisc netem jitter**, and the feature is [broken][3] on 
+Ubuntu kernel 4.15. The solution:
 
   * Please, install 4.13 kernel to have the jitter:
 
@@ -156,15 +205,13 @@ git clone https://github.com/StanfordSNR/pantheon.git && cd pantheon
 git submodule update --init --recursive
 ```
 
-* Prevent Pantheon from applying the patches 
-[reducing MTU](https://pantheon.stanford.edu/faq/#tunnel) of some schemes:
+* Prevent Pantheon from applying the patches [reducing MTU][4] of some schemes:
 
 ```bash
 rm -r src/wrappers/patches
 ```
 
-* The installation of Pantheon and of the included schemes is described 
-[here](https://github.com/StanfordSNR/pantheon#dependencies).
+* The installation of Pantheon and of the included schemes is described [here][2].
 You can skip the installation of Pantheon itself (with  its 
 `tools/install_deps.sh` script). You need to install only the schemes using the 
 commands below. If the last command gives you an error like 
@@ -208,15 +255,13 @@ git clone https://github.com/StanfordSNR/pantheon.git && cd pantheon
 git submodule update --init --recursive
 ```
 
-* Prevent Pantheon from applying the patches 
-[reducing MTU](https://pantheon.stanford.edu/faq/#tunnel) of some schemes:
+* Prevent Pantheon from applying the patches [reducing MTU][4] of some schemes:
 
 ```bash
 rm -r src/wrappers/patches
 ```
 
-* The installation of Pantheon and of the included schemes is described 
-[here](https://github.com/StanfordSNR/pantheon#dependencies).
+* The installation of Pantheon and of the included schemes is described [here][2].
 You can skip the installation of Pantheon itself (with  its 
 `tools/install_deps.sh` script). You need to install only the schemes using the 
 commands below.
@@ -258,15 +303,13 @@ git clone https://github.com/StanfordSNR/pantheon.git && cd pantheon
 git submodule update --init --recursive
 ```
 
-* Prevent Pantheon from applying the patches 
-[reducing MTU](https://pantheon.stanford.edu/faq/#tunnel) of some schemes:
+* Prevent Pantheon from applying the patches [reducing MTU][4] of some schemes:
 
 ```bash
 rm -r src/wrappers/patches
 ```
 
-* The installation of Pantheon and of the included schemes is described 
-[here](https://github.com/StanfordSNR/pantheon#dependencies).
+* The installation of Pantheon and of the included schemes is described [here][2].
 You can skip the installation of Pantheon itself (with  its 
 `tools/install_deps.sh` script). You need to install only the schemes. First, 
 install the dependencies of the schemes:
@@ -384,8 +427,8 @@ lines in the installation script.
 
 ## Third-party libraries
 
-CoCo-Beholder utilizes [Mininet](https://github.com/mininet/mininet) library: 
-the API that allows to create a virtual host as a UNIX shell in a separate 
+CoCo-Beholder utilizes [Mininet][5] library: 
+its API that allows to create a virtual host as a UNIX shell in a separate 
 network namespace, to create a veth pair link between a pair of virtual hosts, 
 and  to launch processes at a virtual host. CoCo-Beholder does not use 
 Controller, Switch, Topology, TCLink or other higher-level entities of Mininet.
