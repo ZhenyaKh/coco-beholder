@@ -184,8 +184,8 @@ The instructions below were tested on the VM with a fresh install of Ubuntu
 Linux kernel >=4.9.
 
 * Fresh releases of 16.04 LTS (16.04.5 and higher) come with Linux kernel 4.15. 
-CoCo-Beholder uses **tc qdisc netem jitter**, and the feature is [broken][3] on 
-Ubuntu kernel 4.15. The solution:
+CoCo-Beholder uses **tc qdisc NetEm delay jitter**, and the feature is 
+[broken][3] on Ubuntu kernel 4.15. The solution:
 
   * Please, install 4.13 kernel to have the jitter:
 
@@ -390,7 +390,7 @@ src/wrappers/vegas.py sender 127.0.0.1 54321 # start client in another shell
 sudo pkill -9 -f vegas                       # kill all the started processes
 ```
 
-* The second way is to make CoCo-Beholder show output of schemes. Change its 
+* The second way is to make CoCo-Beholder show the output of schemes. Change its 
 source code, as shown below, and run schemes [as usual](#testing).
 
 ```bash
@@ -406,7 +406,7 @@ sed -i "$myregex" variable_delay/src/test/test.py
 <details><summary>Please, click to expand.</summary><br></br>
 
 If you want to test a scheme that is not present in Pantheon collection you can 
-add it locally as following:
+add it locally as follows:
 
 * Suppose you want to add TCP CDG. Check if the module is present in your kernel:
 
@@ -417,7 +417,7 @@ find /lib/modules/`(uname -r)`/kernel -type f -name *cdg*
 
 * Add a new `cdg` entry to `pantheon/src/config.yml` file that keeps the list 
 of all the schemes in the collection. The color, name, and marker can be any 
-bacause CoCo-Beholder does not read them.
+because CoCo-Beholder does not read them.
 
 ```yaml
   cdg:
