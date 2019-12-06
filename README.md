@@ -19,8 +19,8 @@ CoCo-Beholder is a human-friendly virtual network  emulator providing the
 popular dumbbell topology of any size. Each link of the topology may have 
 individual  rate, delay, and queue size. The central link may also have a 
 variable delay with optional jitter. Flows of different schemes may run together 
-in the topology for a specified runtime of seconds. For each flow, the direction 
-and the starting second of the runtime  can be chosen.
+in the topology for a specified runtime of seconds. For each flow, its direction 
+and starting second of the runtime  can be chosen.
 
 Each flow has a host in the left half and a host in the right half of the 
 topology and the hosts exchange a scheme's traffic with one host being the 
