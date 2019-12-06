@@ -118,7 +118,7 @@ First, the script simply copies the metadata file from the input folder into
 the output folder. Then, the script processes a pair of PCAP dumps 
 `<flow's starting #>-<scheme>-<sender/receiver>.pcap` of each flow and extracts 
 information on the flow's packets into the flow's individual json data log file. 
-E.g., for two 12 GB PCAP dumps, one ~300 MB data log file is produced. 
+E.g., for two ~12 GB PCAP dumps, one ~300 MB data log file is produced. 
 
 The partial output of the analysis script for the example in the [drawing][1]:
 
