@@ -5,6 +5,7 @@
 [3]: https://bugs.launchpad.net/bugs/1783822 "Tc qdisc NetEm Delay Jitter Bug"
 [4]: https://pantheon.stanford.edu/faq/#tunnel "Pantheon FAQ: Tunnel"
 [5]: https://github.com/mininet/mininet "Mininet on Github"
+[6]: https://pantheon.stanford.edu "Pantheon of Congestion Control"
 
 ```
 
@@ -155,26 +156,26 @@ produce various plots quickly.
 
 ## Installation
 
-The installation process is as following:
+The installation process is as follows:
 
-* Install Pantheon collection of congestion control schemes and, if needed, 
-[add](#adding-a-new-scheme) more schemes to the collection
+* Install [Pantheon][6] collection of congestion control schemes and, if needed, 
+[add](#adding-a-new-scheme) more schemes to the collection locally
 
 * Install CoCo-Beholder emulator using its installation script
 
 * Done. [Test](#testing) the schemes in the collection using CoCo-Beholder.
 
-Installing CoCo-Beholder itself is always trivial because its installation 
-scipt `install.sh` is super easy and short. However, installing the collection 
-of the schemes often causes lots of problems. Also, there are troublesome 
-bugs in some operating systems. Thus, please, see the detailed instructions for 
+Installing CoCo-Beholder itself is trivial, and its installation script 
+`install.sh` is super easy and short. However, installing Pantheon collection 
+of schemes often causes lots of problems. Besides, some Linux distributions 
+just have bugs. Thus, please, see the detailed instructions for installation on 
 [Ubuntu 16.04](#installation-on-ubuntu-1604-lts), 
 [Ubuntu 18.04](#installation-on-ubuntu-1804-lts), and
 [Debian 10](#installation-on-debian-10).
 
 ### Installation on Ubuntu 16.04 LTS
 
-<details> <summary>Please, click to expand.</summary>
+<details><summary>Please, click to expand.</summary><br></br>
 
 The instructions below were tested on the VM with a fresh install of Ubuntu 
 16.04.6-desktop-amd64 (Nov. 2019).
@@ -242,7 +243,7 @@ Now you are ready to [test](#testing) the schemes.
 
 ### Installation on Ubuntu 18.04 LTS
 
-<details> <summary>Please, click to expand.</summary>
+<details><summary>Please, click to expand.</summary><br></br>
 
 The instructions below were tested on the VM with a fresh install of Ubuntu 
 18.04.3-desktop-amd64 (Nov. 2019).
@@ -292,7 +293,7 @@ Now you are ready to [test](#testing) the schemes.
 
 ### Installation on Debian 10
 
-<details> <summary>Please, click to expand.</summary>
+<details><summary>Please, click to expand.</summary><br></br>
 
 The instructions below were tested on the VM with a fresh install of Debian 
 10.1.0-amd64-netinst (Nov. 2019).
