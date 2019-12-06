@@ -184,8 +184,8 @@ The instructions below were tested on the VM with a fresh install of Ubuntu
 Linux kernel >=4.9.
 
 * Fresh releases of 16.04 LTS (16.04.5 and higher) come with Linux kernel 4.15. 
-CoCo-Beholder uses **tc qdisc NetEm delay jitter**, and the feature is 
-[broken][3] on Ubuntu kernel 4.15. The solution:
+CoCo-Beholder uses **tc qdisc NetEm delay jitter** that is [broken][3] on 
+Ubuntu kernel 4.15. The solution:
 
   * Please, install 4.13 kernel to have the jitter:
 
