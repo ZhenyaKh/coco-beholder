@@ -1,11 +1,106 @@
-# CoCo-Beholder: Testing Congestion Control 
+# CoCo-Beholder: Highly-Customizable Testing of Congestion Control Algorithms
+```
 
-CoCo-Beholder is ensured to work with Python 2.7, 3.5, 3.6, and 3.7. 
-CoCo-Beholder installation script `install.sh` installs Python 2 library 
-dependencies by default. For Python 3, please, comment out the corresponding 
-lines in the installation script.
+                           ----    0-TH SEC:    ----
+<--------------------------|  |                 |  |<-------------------CUBIC
+                           |  |      500ms      |  |
+CUBIC--------------------->|  |      ^^^^^5ms   |  |------------------------>
+                           |  |  10ms|   |      |  |
+                           |  |---120Mbps,20ms--|  |
+                           |  |                 |  |
+                           |  |    15-TH SEC:   |  |
+VEGAS---120Mbps,2000pkts-->|  |                 |  |--120Mbps,5ms,3000pkts-->
+                           |  |                 |  |
+VEGAS---120Mbps,2000pkts-->|  |                 |  |--120Mbps,5ms,3000pkts-->
+                           ----     30 SECS     ----
+                    
+```                
+CoCo-Beholder is a human-friendly virtual network  emulator providing the 
+popular dumbbell topology of any size. Each link of the topology may have 
+individual  rate, delay, and queue size. The central link may also have a 
+variable delay with optional jitter. Flows of different schemes may run together 
+in the topology for a specified runtime of seconds. For each flow, the direction 
+and the starting second of the runtime  can be chosen.
+
+Each flow has a host in the left half and a host in the right half of the 
+topology and the hosts exchange a scheme's traffic with one host being the 
+sender and one being the receiver. There is the left router that interconnects 
+all the hosts in the left half and the right router that interconnects all the 
+hosts in the right half of the topology. All the flows share the common central 
+link between the two routers.
 
 ## Testing
+
+This command specifies the path to the [collection](#installation) containing 
+the schemes to test and launches the testing for 30 seconds, with the central 
+link having 120  Mbps rate and the variable delay with the base delay 20 ms, 
+delta 500 ms, step 10 ms, jitter 5 ms.
+
+```bash
+./run.py -p ~/pantheon 20ms 0.5s 10ms 5ms -t 30 -r 120 -s 12345
+```
+
+If this is the first run of the script, the default layout file `layout.yml` is
+generated, as shown below. The resulting testing setup is present in the 
+[drawing](#coco-beholder-highly-customizable-testing-of-congestion-control-algorithms) 
+of the dumbbell topology at the top of this page. The layout file can be edited 
+to get much more complex testing setups with more flows belonging to various 
+schemes and having diverse network settings.
+
+```yaml
+# Delays/rates are optional: if lacking or null, they are set to 0us/0.0
+# and for netem, to set delay/rate to zero is same as to leave it unset.
+# Sizes of queues are optional: if lacking or null, they are set to 1000.
+- direction: <-
+  flows: 1
+  left-delay: null
+  left-queues: null
+  left-rate: null
+  right-delay: null
+  right-queues: null
+  right-rate: null
+  scheme: cubic
+  start: 0
+- direction: ->
+  flows: 2
+  left-delay: 0us
+  left-queues: 2000
+  left-rate: 120.0
+  right-delay: 5ms
+  right-queues: 3000
+  right-rate: 120
+  scheme: vegas
+  start: 15
+- direction: ->
+  flows: 1
+  scheme: cubic
+  start: 0
+```
+
+The rate, delay, and queue size are always installed **at both the interfaces** 
+at the ends of each link in the topology using `tc` qdisc NetEm link emulator. 
+In particular, this means that the RTT of a link is twice the (one-way) delay. 
+Only the central link may have two different queue sizes of the interfaces at 
+its ends -- see `-q1`, `-q2`, `-q` arguments in the help message of the script.
+
+The variable delay at the central link is defined by four positional arguments:
+the base delay, delta, step, and jitter, where the jitter can be skipped. Each
+delta time, the delay is increased or decreased by step depending on a 
+pseudorandom generator, whose seed can be specified with `-s` argument or is 
+assigned the current UNIX time. To have a constant delay at the central link, 
+one can choose the delta >= the runtime `-t`.
+
+Into a chosen output directory, `metadata.json` file is written containing
+**all** the parameters of the test, including the generator seed. The file may 
+be fed to CoCo-Beholder in the future to fully reproduce the test. Also, during 
+the testing, PCAP dump files are recorded at all the hosts of the dumbbell 
+topology into the output directory using `tcpdump`. So for the example in the
+[drawing](#coco-beholder-highly-customizable-testing-of-congestion-control-algorithms),
+eight PCAP dump files were recorded.
+
+Note: the maximum delay at both the side links and the central link (jitter not 
+counted) can be specified with `-m` option. To have a square-wave delay at the 
+central link, set the maximum delay to the sum of the base delay and step.
 
 ## Installation
 
@@ -35,7 +130,7 @@ The instructions below were tested on the VM with a fresh install of Ubuntu
 Linux kernel >=4.9.
 
 * Fresh releases of 16.04 LTS (16.04.5 and higher) come with Linux kernel 4.15. 
-CoCo-Beholder [uses](#testing) **tc qdisc netem jitter**, and the feature is 
+CoCo-Beholder uses **tc qdisc netem jitter**, and the feature is 
 [broken](https://bugs.launchpad.net/bugs/1783822) on Ubuntu kernel 4.15. The 
 solution:
 
@@ -278,6 +373,13 @@ sed -i 's/vegas/cdg/g' pantheon/src/wrappers/cdg.py
 
 Now you can [test](#testing) cdg with CoCo-Beholder as usual by specifying cdg 
 flows in the layout file.
+
+## Python Support
+
+CoCo-Beholder is ensured to work with Python 2.7, 3.5, 3.6, and 3.7. 
+CoCo-Beholder installation script `install.sh` installs Python 2 library 
+dependencies by default. For Python 3, please, comment out the corresponding 
+lines in the installation script.
 
 ## Third-party libraries
 
