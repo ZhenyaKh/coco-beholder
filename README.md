@@ -375,6 +375,8 @@ Now you are ready to [test](#testing) the schemes.
 
 ## Troubleshooting a scheme
 
+<details><summary>Please, click to expand.</summary><br></br>
+
 * The first way is to launch a scheme on localhost without an emulator. This
 enables to see the output of the scheme:
 
@@ -396,7 +398,12 @@ cd coco-beholder
 myregex='s/(\(.\+\)).pid/(\1, stdout=None, stderr=None).pid/g'
 sed -i "$myregex" variable_delay/src/test/test.py
 ```
+
+</details>
+
 ## Adding a new scheme
+
+<details><summary>Please, click to expand.</summary><br></br>
 
 If you want to test a scheme that is not present in Pantheon collection you can 
 add it locally as following:
@@ -428,6 +435,8 @@ sed -i 's/vegas/cdg/g' pantheon/src/wrappers/cdg.py
 
 Now you can [test](#testing) cdg with CoCo-Beholder as usual by specifying cdg 
 flows in the layout file.
+
+</details>
 
 ## Python Support
 
