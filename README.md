@@ -448,10 +448,10 @@ lines in the installation script.
 ## Third-party libraries
 
 CoCo-Beholder utilizes [Mininet][5] library: 
-its API that allows to create a virtual host as a UNIX shell in a separate 
+its API that enables to create a virtual host as a UNIX shell in a separate 
 network namespace, to create a veth pair link between a pair of virtual hosts, 
 and  to launch processes at a virtual host. CoCo-Beholder does not use 
 Controller, Switch, Topology, TCLink or other higher-level entities of Mininet.
-To prevent any future compatability issues and to make the installation of 
-CoCo-Beholder easier, the needed parts of Mininet 2.3.0d5 are included into
+To prevent any future compatibility issues and to make the installation of 
+CoCo-Beholder easier, the needed parts of Mininet 2.3.0d5 are included in
 CoCo-Beholder repository as a third-party library according to Mininet license.
