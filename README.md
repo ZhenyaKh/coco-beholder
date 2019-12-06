@@ -82,6 +82,7 @@ at the ends of each link in the topology using `tc` qdisc NetEm link emulator.
 In particular, this means that the RTT of a link is twice the (one-way) delay. 
 Only the central link may have two different queue sizes of the interfaces at 
 its ends -- see `-q1`, `-q2`, `-q` arguments in the help message of the script.
+By default, both the queues are of 1000 packets.
 
 The variable delay at the central link is defined by four positional arguments:
 the base delay, delta, step, and jitter, where the jitter can be skipped. Each
