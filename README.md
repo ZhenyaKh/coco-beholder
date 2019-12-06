@@ -89,7 +89,7 @@ the base delay, delta, step, and jitter, where the jitter can be skipped. Each
 delta time, the delay is increased or decreased by step depending on a 
 pseudorandom generator, whose seed can be specified with `-s` argument or is 
 assigned the current UNIX time. To have a constant delay at the central link, 
-one can choose the delta >= the runtime `-t`.
+choose the delta >= the runtime `-t`.
 
 Into a chosen output directory, `metadata.json` file is written containing
 **all** the parameters of the test, including the generator seed. The file may 
