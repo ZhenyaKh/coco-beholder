@@ -209,7 +209,7 @@ of a curve are the same values computed in different ways.
 
 The per-flow per-packet one-way delay plot for the example in the [drawing][1]:
 
-<img src=".example.png" width="620" height="400" 
+<img src=".example.png" width="777" height="500" 
      title="Per-Flow Per-Packet One-Way Delay Plot"
      alt="Example per-flow per-packet one-way delay plot">
 
