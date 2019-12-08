@@ -190,6 +190,8 @@ the curves present in the corresponding average throughput plot.
 
 Arguments `-c` and `-j` allow changing colors of the curves in plots flexibly. 
 
+---------------------------------------
+
 For a chosen type, the statistics file is generated. It does **not** depend on
 the chosen aggregation interval and contains the following:
 
