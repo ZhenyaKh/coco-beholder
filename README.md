@@ -154,6 +154,55 @@ produce various plots quickly.
 
 ## Plots and statistics generation
 
+The plotting tool processes data log files of the flows and saves the resulting
+plots and statistics into the output folder -- `graphs` by default.
+
+Different types of plots and statistics can be generated:
+
+```
+  -f, --per-flow        Graphs and stats are generated per flow, i.e. each
+                        graph has a separate curve per flow
+                        
+  -t, --total           Total graphs and stats are generated for all flows
+                        altogether, i.e. each graph has only one curve
+                        
+  -s "FIELD1 FIELD2...", --per-subset "FIELD1 FIELD2..."
+                        Graphs and stats are generated per subset, i.e. each
+                        graph has one curve per subset. Flows are in one
+                        subset if they have the same values of the chosen
+                        layout field(s). E.g. for -s "scheme direction", each
+                        graph will have one curve per subset of flows having
+                        both the same scheme name and direction. Currently
+                        allowed layout fields: ['scheme', 'direction'].
+```
+
+For a chosen type, three line plots and one scatter plot are generated:
+* average throughput       
+* average one-way delay    
+* average Jain's index     
+* per-packet one-way delay
+
+Average plots are averaged per an aggregation time interval: any positive float
+number supplied with `-i` argument or 0.5 seconds by default.
+
+Average Jain's index plot always contains one curve, as it is computed over 
+the curves present in the corresponding average throughput plot.
+
+Arguments `-c` and `-j` allow changing colors of the curves in plots flexibly. 
+
+For a chosen type, the statistics file is generated. It does **not** depend on
+the chosen aggregation interval and contains the following:
+
+* each curve's overall average throughput over the curve's whole duration (Mbps)
+* each curve's overall average one-way delay over all the curve's packets (ms)
+* each curve's overall median, average, and 95th percentile per-packet one-way 
+  delays over all the curve's packets (ms)
+* overall Jain's index value for all the curves together, computed over the 
+  average throughput statistics of the curves
+
+The overall average one-way delay and overall average per-packet one-way delay 
+of a curve are the same values computed in different ways.
+
 ## Installation
 
 The installation process is as follows:
