@@ -205,6 +205,14 @@ the chosen aggregation interval and contains the following:
 The overall average one-way delay and overall average per-packet one-way delay 
 of a curve are the same values computed in different ways.
 
+---------------------------------------
+
+The per-flow per-packet one-way delay plot for the example in the [drawing][1]:
+
+<img src=".example.png" width="620" height="400" 
+     title="Per-Flow Per-Packet One-Way Delay Plot"
+     alt="Example per-flow per-packet one-way delay plot">
+
 ## Installation
 
 The installation process is as follows:
