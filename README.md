@@ -166,6 +166,10 @@ produce various plots quickly.
 
 ## Plots and Statistics Generation
 
+<img src=".example.png" width="777" height="500" 
+     title="Per-Flow Per-Packet One-Way Delay Plot"
+     alt="Example per-flow per-packet one-way delay plot">
+
 Plotting script `plot.py` reads data log files of the flows and generates 
 plots and statistics into the output folder (`graphs` by default).
 
@@ -194,13 +198,16 @@ For a chosen type, three line plots and one scatter plot are generated:
 * average Jain's index     
 * per-packet one-way delay
 
+E.g., [above](#plots-and-statistics-generation), one can see the per-flow 
+per-packet one-way delay plot for the setup in the [drawing][1].
+
 Average plots are averaged per an aggregation time interval: any positive float
 number supplied with `-i` argument or 0.5 seconds by default.
 
-Average Jain's index plot always contains one curve, as it is computed over 
-the curves present in the corresponding average throughput plot.
+Average Jain's index plot always contains one curve that is computed over the 
+curves present in the corresponding average throughput plot.
 
-Arguments `-c` and `-j` allow changing colors of the curves in plots flexibly. 
+Arguments `-c` and `-j` allow changing colors of the curves in plots flexibly.
 
 ---------------------------------------
 
@@ -216,14 +223,6 @@ the chosen aggregation interval and contains the following:
 
 The overall average one-way delay and overall average per-packet one-way delay 
 of a curve are the same values computed in different ways.
-
----------------------------------------
-
-The per-flow per-packet one-way delay plot for the example in the [drawing][1]:
-
-<img src=".example.png" width="777" height="500" 
-     title="Per-Flow Per-Packet One-Way Delay Plot"
-     alt="Example per-flow per-packet one-way delay plot">
 
 ## Installation
 
