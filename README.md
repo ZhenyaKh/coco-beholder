@@ -514,3 +514,16 @@ Controller, Switch, Topology, TCLink or other higher-level entities of Mininet.
 To prevent any future compatibility issues and to make the installation of 
 CoCo-Beholder easier, the needed parts of Mininet 2.3.0d5 are included in
 CoCo-Beholder repository as a third-party library according to Mininet license.
+
+## Authorship
+
+**Evgeniya Khasina** implemented the program in the scope of the Master thesis 
+*"The CoCo-Beholder: Enabling Comprehensive Evaluation of Congestion Control 
+Algorithms"* at Saarland University in 2019 under the supervision of
+**Professor Anja Feldmann** and **Dr. Corinna Coupette** at 
+Internet Architecture Department of Max Planck Institute for Informatics.
+
+## Contact
+
+For any questions on the program, you may write to me, Evgeniya Khasina, to my
+[E-mail](mailto:jenya-100@yandex.ru) address.
