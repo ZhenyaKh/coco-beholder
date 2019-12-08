@@ -37,6 +37,18 @@ all the hosts in the left half and the right router that interconnects all the
 hosts in the right half of the topology. All the flows share the common central 
 link between the two routers.
 
+### Table of Contents
+**[Testing](#testing)**<br>
+**[Analysis](#analysis)**<br>
+**[Plots and Statistics Generation](#plots-and-statistics-generation)**<br>
+**[Installation](#installation)**<br>
+**[Troubleshooting a Scheme](#troubleshooting-a-scheme)**<br>
+**[Adding a New Scheme](#adding-a-new-scheme)**<br>
+**[Python Support](#python-support)**<br>
+**[Third-Party Libraries](#third-party-libraries)**<br>
+**[Authorship](#authorship)**<br>
+**[Contact](#contact)**<br>
+
 ## Testing
 
 This command specifies the path to the [collection](#installation) containing 
@@ -152,7 +164,7 @@ anymore. The analysis of the PCAP dumps is performed only once, and then the
 plotting tool may be run as many times as needed over the data log files to 
 produce various plots quickly.
 
-## Plots and statistics generation
+## Plots and Statistics Generation
 
 The plotting tool processes data log files of the flows and saves the resulting
 plots and statistics into the output folder -- `graphs` by default.
@@ -432,7 +444,7 @@ Now you are ready to [test](#testing) the schemes.
 
 </details>
 
-## Troubleshooting a scheme
+## Troubleshooting a Scheme
 
 <details><summary>Please, click to expand.</summary><br></br>
 
@@ -460,7 +472,7 @@ sed -i "$myregex" variable_delay/src/test/test.py
 
 </details>
 
-## Adding a new scheme
+## Adding a New Scheme
 
 <details><summary>Please, click to expand.</summary><br></br>
 
@@ -504,7 +516,7 @@ CoCo-Beholder installation script `install.sh` installs Python 2 library
 dependencies by default. For Python 3, please, comment out the corresponding 
 lines in the installation script.
 
-## Third-party libraries
+## Third-Party Libraries
 
 CoCo-Beholder utilizes [Mininet][5] library: 
 its API that enables to create a virtual host as a UNIX shell in a separate 
