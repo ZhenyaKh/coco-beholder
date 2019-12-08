@@ -161,12 +161,12 @@ Saving the data of the flow to the file...
 
 For forthcoming plots and statistics generation, the PCAP dumps are not needed 
 anymore. The analysis of the PCAP dumps is performed only once, and then the 
-plotting tool may be run as many times as needed over the data log files to 
+plotting script may be run as many times as needed over the data log files to 
 produce various plots quickly.
 
 ## Plots and Statistics Generation
 
-The plotting tool processes data log files of the flows and saves the resulting
+Plotting script `plot.py` reads data log files of the flows and generates 
 plots and statistics into the output folder -- `graphs` by default.
 
 Different types of plots and statistics can be generated:
