@@ -167,7 +167,7 @@ produce various plots quickly.
 ## Plots and Statistics Generation
 
 Plotting script `plot.py` reads data log files of the flows and generates 
-plots and statistics into the output folder -- `graphs` by default.
+plots and statistics into the output folder (`graphs` by default).
 
 Different types of plots and statistics can be generated:
 
