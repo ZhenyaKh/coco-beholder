@@ -6,7 +6,7 @@
 [4]: https://pantheon.stanford.edu/faq/#tunnel "Pantheon FAQ: Tunnel"
 [5]: https://github.com/mininet/mininet "Mininet on Github"
 [6]: https://pantheon.stanford.edu "Pantheon of Congestion Control"
-[7]: https://doi.org/10.13140/RG.2.2.26079.61609
+[7]: https://doi.org/10.13140/RG.2.2.26079.61609 "doi:10.13140/RG.2.2.26079.61609"
 
 ```
 
