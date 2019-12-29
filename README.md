@@ -118,7 +118,7 @@ the testing, PCAP dump files are recorded at all the hosts of the dumbbell
 topology into the output directory using `tcpdump`. So for the example in the
 [drawing][1], eight PCAP dump files were recorded.
 
-**Note #1:** The maximum delay for any link – side or central (jitter not 
+**Note #1:** The maximum delay for every link – side and central (jitter not 
 counted) – can be specified with `-m` option. To have a square-wave delay at 
 the central link, set the maximum delay to the sum of the base delay and step.
 
