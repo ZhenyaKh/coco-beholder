@@ -101,7 +101,7 @@ The rate, delay, and queue size are always installed **at both the interfaces**
 at the ends of each link in the topology using `tc` qdisc NetEm link emulator. 
 In particular, this means that the RTT of a link is twice the (one-way) delay. 
 Only the central link may have two different queue sizes of the interfaces at 
-its ends -- see `-q1`, `-q2`, `-q` arguments in the help message of the script.
+its ends – see `-q1`, `-q2`, `-q` arguments in the help message of the script.
 By default, both the queues are of 1000 packets.
 
 The variable delay at the central link is defined by four positional arguments:
@@ -118,18 +118,18 @@ the testing, PCAP dump files are recorded at all the hosts of the dumbbell
 topology into the output directory using `tcpdump`. So for the example in the
 [drawing][1], eight PCAP dump files were recorded.
 
-Note #1: The maximum delay at both the side links and the central link (jitter 
-not counted) can be specified with `-m` option. To have a square-wave delay at 
+**Note #1:** The maximum delay for any link – side or central (jitter not 
+counted) – can be specified with `-m` option. To have a square-wave delay at 
 the central link, set the maximum delay to the sum of the base delay and step.
 
-Note #2: The testing script runs `src/wrappers/<cc>.py setup_after_reboot` for 
-each scheme in the layout file before launching any flows of the schemes, so 
-the user does *not* have to manually set schemes up after every reboot.
+**Note #2:** The testing script runs `src/wrappers/<cc>.py setup_after_reboot` 
+for each scheme in the layout file before launching any flows of the schemes, 
+so the user does *not* have to manually set schemes up after every reboot.
 
 ## Analysis
 
 Analysis script only accepts two arguments: the input folder and output folder 
--- `dumps` and `graphs/data` by default. 
+– `dumps` and `graphs/data` by default. 
 
 First, the script simply copies the metadata file from the input folder into 
 the output folder. Then, the script processes a pair of PCAP dumps 
