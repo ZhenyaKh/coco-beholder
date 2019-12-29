@@ -53,9 +53,9 @@ link between the two routers.
 ## Testing
 
 This command specifies the path to the [collection](#installation) containing 
-the schemes to test and launches the testing for 30 seconds, with the central 
-link having 120  Mbps rate and the variable delay with the base delay 20 ms, 
-delta 500 ms, step 10 ms, jitter 5 ms.
+the schemes to test and launches a 30-second testing, with the central link 
+having 120  Mbps rate and the variable delay with the base delay 20 ms, delta 
+500 ms, step 10 ms, jitter 5 ms.
 
 ```bash
 ./run.py -p ~/pantheon 20ms 0.5s 10ms 5ms -t 30 -r 120 -s 12345
@@ -118,9 +118,13 @@ the testing, PCAP dump files are recorded at all the hosts of the dumbbell
 topology into the output directory using `tcpdump`. So for the example in the
 [drawing][1], eight PCAP dump files were recorded.
 
-Note: the maximum delay at both the side links and the central link (jitter not 
-counted) can be specified with `-m` option. To have a square-wave delay at the 
-central link, set the maximum delay to the sum of the base delay and step.
+Note #1: The maximum delay at both the side links and the central link (jitter 
+not counted) can be specified with `-m` option. To have a square-wave delay at 
+the central link, set the maximum delay to the sum of the base delay and step.
+
+Note #2: The testing script runs `src/wrappers/<cc>.py setup_after_reboot` for 
+each scheme in the layout file before launching any flows of the schemes, so 
+the user does *not* have to manually set schemes up after every reboot.
 
 ## Analysis
 
@@ -131,7 +135,7 @@ First, the script simply copies the metadata file from the input folder into
 the output folder. Then, the script processes a pair of PCAP dumps 
 `<flow's starting #>-<scheme>-<sender/receiver>.pcap` of each flow and extracts 
 information on the flow's packets into the flow's individual json data log file. 
-E.g., for two ~12 GB PCAP dumps, one ~300 MB data log file is produced. 
+E.g., for two ~12 GB dumps, one ~300 MB data log file is produced. 
 
 The partial output of the analysis script for the example in the [drawing][1]:
 
