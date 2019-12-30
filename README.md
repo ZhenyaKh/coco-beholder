@@ -206,7 +206,7 @@ E.g., [above](#plots-and-statistics-generation), one can see the per-flow
 per-packet one-way delay plot for the setup in the [drawing][1].
 
 Average plots are averaged per an aggregation time interval: any positive float
-number supplied with `-i` argument or 0.5 seconds by default.
+number supplied with `-i` argument or 0.5 second by default.
 
 Average Jain's index plot always contains one curve that is computed over the 
 curves present in the corresponding average throughput plot.
@@ -515,9 +515,9 @@ flows in the layout file.
 ## Python Support
 
 CoCo-Beholder is ensured to work with Python 2.7, 3.5, 3.6, and 3.7. 
-CoCo-Beholder installation script `install.sh` installs Python 2 library 
-dependencies by default. For Python 3, comment out the corresponding lines 
-in the installation script.
+CoCo-Beholder's installation script `install.sh` installs Python 2 library 
+dependencies by default. For Python 3, please, comment out the corresponding 
+lines in the installation script.
 
 ## Third-Party Libraries
 
