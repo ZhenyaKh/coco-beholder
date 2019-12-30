@@ -53,19 +53,19 @@ link between the two routers.
 ## Testing
 
 This command specifies the path to the [collection](#installation) containing 
-the schemes to test and launches a 30-second testing, with the central link 
-having 120  Mbps rate and the variable delay with the base delay 20 ms, delta 
-500 ms, step 10 ms, jitter 5 ms.
+the schemes to test and runs the testing for 30 seconds, with the central link 
+having 120  Mbps rate and the variable delay (the base delay 20 ms, delta 
+500 ms, step 10 ms, jitter 5 ms):
 
 ```bash
 ./run.py -p ~/pantheon 20ms 0.5s 10ms 5ms -t 30 -r 120 -s 12345
 ```
 
-If this is the first run of the script, the default layout file `layout.yml` is
-generated, as shown below. The resulting testing setup is present in the 
-[drawing][1] of the dumbbell topology at the top of this page. The layout file 
-can be edited to get much more complex testing setups with more flows belonging 
-to various schemes and having diverse network settings.
+If this is the first run of the script, the default layout file `layout.yml`, 
+shown below, is generated and used. The resulting testing setup is present in 
+the [drawing][1] of the dumbbell topology at the top of this page. The layout 
+file can be edited to get much more complex testing setups with more flows 
+belonging to various schemes and having diverse network settings.
 
 ```yaml
 # Delays/rates are optional: if lacking or null, they are set to 0us/0.0
