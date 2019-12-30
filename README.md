@@ -122,8 +122,8 @@ topology into the output directory using `tcpdump`. So for the example in the
 counted) – can be specified with `-m` option. To have a square-wave delay at 
 the central link, set the maximum delay to the sum of the base delay and step.
 
-**Note #2:** The testing script runs `src/wrappers/<cc>.py setup_after_reboot` 
-for each scheme in the layout file before launching any flows of the schemes, 
+**Note #2:** The testing script calls `setup_after_reboot` on Pantheon wrapper 
+of each scheme in the layout file before launching any flows of the schemes, 
 so the user does *not* have to manually set schemes up after every reboot.
 
 ## Analysis
