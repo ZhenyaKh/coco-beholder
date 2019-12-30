@@ -176,9 +176,8 @@ produce various plots quickly.
      alt="Example per-flow per-packet one-way delay plot">
 
 Plotting script `plot.py` reads data log files of the flows and generates 
-plots and statistics into the output folder (`graphs` by default).
-
-Different types of plots and statistics can be generated:
+plots and statistics into the output folder (`graphs` by default). Different 
+types of plots and statistics can be generated:
 
 ```
   -f, --per-flow        Graphs and stats are generated per flow, i.e. each
@@ -197,7 +196,7 @@ Different types of plots and statistics can be generated:
                         allowed layout fields: ['scheme', 'direction'].
 ```
 
-For a chosen type, three line plots and one scatter plot are generated:
+For a selected type, three line plots and one scatter plot are generated:
 * average throughput       
 * average one-way delay    
 * average Jain's index     
@@ -216,8 +215,8 @@ Arguments `-c` and `-j` allow changing colors of the curves in plots flexibly.
 
 ---------------------------------------
 
-For a chosen type, the statistics file is generated. It does **not** depend on
-the chosen aggregation interval and contains the following:
+For a selected type, the statistics file is generated. It does **not** depend on
+the chosen aggregation interval and contains:
 
 * each curve's overall average throughput over the curve's whole duration (Mbps)
 * each curve's overall average one-way delay over all the curve's packets (ms)
@@ -517,8 +516,8 @@ flows in the layout file.
 
 CoCo-Beholder is ensured to work with Python 2.7, 3.5, 3.6, and 3.7. 
 CoCo-Beholder installation script `install.sh` installs Python 2 library 
-dependencies by default. For Python 3, please, comment out the corresponding 
-lines in the installation script.
+dependencies by default. For Python 3, comment out the corresponding lines 
+in the installation script.
 
 ## Third-Party Libraries
 
